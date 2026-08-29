@@ -1,83 +1,225 @@
-# Repair System — Error Knowledge Base
+# Repair System
 
 > **Metadata**
-> - last-updated-by: (set on first entry)
-> - last-verified-against-code: (set after fix verification)
-> - staleness-policy: individual entries may be stale if the code has changed around them — verify fix still applies before reusing
+> - last-updated-by: bootstrap-project
+> - last-verified-against-code: 2026-08-29
+> - staleness-policy: re-verify when error patterns change
 
-> **Overview:** Living knowledge base of errors encountered during development, their root causes, and how they were fixed. Agents must search this before diagnosing new errors and log every fixed bug to prevent recurrence.
-
----
-
-## How to Use
-
-- **Before debugging:** Search this file for patterns matching the current error
-- **After fixing a bug:** Add an entry using the template below
-- **If a fix no longer applies:** Mark the entry as `[SUPERSEDED]` and link to the new entry
+> **Overview:** Known error patterns and their fixes for this codebase. Used by `commands/fix-build.md`.
 
 ---
 
-## Error Log
+## Common Issues & Fixes
 
-### [TEMPLATE]
+### Prisma Client Not Generated
 
-```
-## [Error Title]
+**Error**: `PrismaClient is not defined` or `Cannot find module '@prisma/client'`
 
-**Symptom:**
-[What the developer or user sees]
-
-**Root Cause:**
-[The actual technical reason]
-
-**Fix Applied:**
-[What change was made]
-
-**Prevention:**
-[How to avoid this in future]
-
-**Files Affected:**
-[list of files]
-
-**Date:** [YYYY-MM-DD]
-**Status:** [Active / Superseded]
+**Fix**:
+```bash
+npm run db:generate
 ```
 
+**Prevention**: Run after any schema.prisma changes
+
 ---
 
-## Known Error Patterns
+### Database Connection Failed
 
-### React / Next.js
+**Error**: `P1001: Can't reach database server` or `ECONNREFUSED`
 
-**Hydration Mismatch**
-- Symptom: `Hydration failed because the initial UI does not match what was rendered on the server`
-- Cause: Browser-only logic (window, localStorage, Date.now()) running during server render
-- Fix: Wrap in `useEffect` or use `dynamic(() => import(...), { ssr: false })`
-- Prevention: Never access browser APIs outside useEffect in components
+**Causes**:
+- PostgreSQL not running
+- Wrong DATABASE_URL in .env
+- Database doesn't exist
 
-**Missing Key Prop**
-- Symptom: `Each child in a list should have a unique "key" prop`
-- Cause: `.map()` rendering without a stable unique key
-- Fix: Add `key={item.id}` — use a stable unique ID, not the array index
+**Fix**:
+```bash
+# Check PostgreSQL status
+sudo systemctl status postgresql
 
-### Node.js / Backend
+# Or start Docker container
+docker run --name postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=asset_mgmt -p 5432:5432 -d postgres:14
 
-**Unhandled Promise Rejection**
-- Symptom: Server crashes silently or logs `UnhandledPromiseRejectionWarning`
-- Cause: async function missing try/catch or `.catch()` not attached to promise
-- Fix: Wrap async route handlers in try/catch; use a global async error wrapper
-- Prevention: Always release DB connections in finally, not just success path
+# Verify .env has correct URL
+cat .env | grep DATABASE_URL
+```
 
-**Database Connection Pool Exhausted**
-- Symptom: Requests hang indefinitely under load
-- Cause: Connection pool limit too low or connections not released
-- Fix: Increase pool size; ensure `client.release()` in finally blocks
-- Prevention: Always release connections in finally
+---
 
-### Configuration / Environment
+### Migration Issues
 
-**Missing Environment Variable**
-- Symptom: `undefined` values in production, features silently broken
-- Cause: Variable defined in `.env.local` but not in production environment
-- Fix: Add to deployment environment variables
-- Prevention: Add a startup validation check that throws if required env vars are missing
+**Error**: `P3000: Failed to apply migration` or schema drift
+
+**Fix**:
+```bash
+# For development: push schema directly
+npm run db:push
+
+# For production: create migration
+npm run db:migrate
+
+# Reset database (dev only)
+npx prisma migrate reset
+```
+
+---
+
+### TypeScript Errors
+
+**Error**: Type errors after schema changes
+
+**Fix**:
+```bash
+npm run db:generate
+npm run typecheck
+```
+
+**Common Causes**:
+- Prisma client not regenerated after schema change
+- Missing type imports
+- Strict mode violations
+
+---
+
+### Next.js Build Errors
+
+**Error**: `Module not found` or build failures
+
+**Fix**:
+```bash
+# Clear Next.js cache
+rm -rf .next
+
+# Reinstall dependencies
+rm -rf node_modules package-lock.json
+npm install
+
+# Check for circular imports
+```
+
+---
+
+### Authentication Issues
+
+**Error**: `401 Unauthorized` on protected routes
+
+**Causes**:
+- JWT_SECRET not set in .env
+- Cookie not being set (check Secure flag in production)
+- Token expired (7-day default)
+- Middleware not matching route
+
+**Fix**:
+```bash
+# Verify .env has JWT_SECRET (min 32 chars)
+# Check cookie in browser dev tools
+# Verify middleware matcher in src/middleware.ts
+```
+
+---
+
+### Tailwind Styles Not Applied
+
+**Error**: Components missing styles
+
+**Causes**:
+- Content paths in tailwind.config.ts don't match file locations
+- PostCSS not processing
+- JIT mode issues
+
+**Fix**:
+```bash
+# Verify tailwind.config.ts content paths
+# Restart dev server
+npm run dev
+```
+
+---
+
+### API Route Errors
+
+**Error**: `500 Internal Server Error` on API routes
+
+**Debugging**:
+```bash
+# Check server logs in terminal
+# Add console.log in API route
+# Verify Prisma queries in Prisma Studio
+npm run db:studio
+```
+
+**Common Causes**:
+- Missing await on Prisma calls
+- Incorrect where clauses
+- Authorization check failures
+- Audit log creation errors (non-blocking)
+
+---
+
+### Seed Script Failures
+
+**Error**: Seed script throws error
+
+**Fix**:
+```bash
+# Run with verbose output
+npx tsx prisma/seed.ts
+
+# Common issues:
+# - Unique constraint violations (run db:push first)
+# - Foreign key references missing
+# - Enum values don't match schema
+```
+
+---
+
+## Debugging Commands
+
+```bash
+# View database
+npm run db:studio
+
+# Check Prisma schema validity
+npx prisma validate
+
+# View generated client types
+cat node_modules/@prisma/client/index.d.ts | head -100
+
+# Check environment variables
+cat .env
+
+# View Next.js build output
+npm run build 2>&1 | head -50
+
+# Run typecheck
+npm run typecheck
+
+# Run lint
+npm run lint
+```
+
+---
+
+## Emergency Procedures
+
+### Database Corruption / Data Loss
+
+1. Stop application
+2. Restore from latest backup
+3. Run `npm run db:push` to ensure schema matches
+4. Restart application
+
+### Security Incident (JWT Secret Compromised)
+
+1. Generate new JWT_SECRET
+2. Update .env and redeploy
+3. All existing sessions invalidated (users re-login)
+4. Audit recent audit logs for suspicious activity
+
+### Performance Degradation
+
+1. Check database query performance in Prisma Studio
+2. Add missing indexes (see schema @@index)
+3. Enable query logging in development
+4. Consider pagination for large datasets
