@@ -1,114 +1,160 @@
-# Default Template
+# Asset Management Platform
 
-A GitHub template repository incorporating the **`ai-system` v3** framework for AI-assisted software development, pre-configured with an **opencode local trigger workflow**.
+A modern IT Asset Management Platform to replace manual asset tracking processes.
 
----
+## Features
 
-## What's Included
+- **Asset Management**: Full lifecycle tracking of IT assets (laptops, phones, accessories)
+- **Accessory Tracking**: Individual accessory IDs for easy reassignment (chargers, keyboards, mice, headsets, carrying cases, docking stations)
+- **Approval Chain**: Multi-level approval workflows with HR, IT, and Compliance departments
+- **Audit Trail**: Complete audit logging with timestamps, actors, and before/after states
+- **Role-Based Access Control**: Superadmin, Admin, Department Heads, Officers, and Employees
+- **Asset Custody & Acknowledgement**: Digital acknowledgement statements for asset issuance and return
+- **User Management**: Superadmin can invite users with department, role, and privilege assignments
 
-### `ai-system/` — AI-Assisted Development System
+## Tech Stack
 
-A vendor-neutral, model-agnostic framework for AI-assisted software development. Provides structured documentation, command-driven workflows, and quality gates that work identically across any AI coding tool.
+- **Frontend**: Next.js 14 (App Router), React 18, TypeScript
+- **Styling**: Tailwind CSS
+- **Database**: PostgreSQL with Prisma ORM
+- **Authentication**: JWT with HttpOnly cookies
+- **Forms**: React Hook Form + Zod validation
+- **UI Components**: Custom components with Radix UI primitives
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 18+
+- PostgreSQL 14+
+- npm or yarn
+
+### Installation
+
+1. Clone the repository
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Set up environment variables:
+   ```bash
+   cp .env.example .env
+   ```
+   Update `.env` with your database URL and JWT secret.
+
+4. Set up the database:
+   ```bash
+   npm run db:generate
+   npm run db:push
+   npm run db:seed
+   ```
+
+5. Start the development server:
+   ```bash
+   npm run dev
+   ```
+
+6. Open [http://localhost:3000](http://localhost:3000)
+
+### Default Credentials
+
+After seeding, you can login with:
+
+- **Super Admin**: admin@company.com / admin123
+- **HR Head**: hr.head@company.com / hrhead123
+- **IT Head**: it.head@company.com / ithead123
+- **Compliance Head**: compliance.head@company.com / comphead123
+- **IT Officer**: it.officer@company.com / itofficer123
+- **HR Officer**: hr.officer@company.com / hroffice123
+- **Compliance Officer**: compliance.officer@company.com / comportofficer123
+- **Employees**: employee123
+
+## Project Structure
 
 ```
-ai-system/
-├── protocols/          # Entry, tiering, QA, escalation, verification
-├── agents/             # Function-based roles (Planner, Architect, Implementer, etc.)
-├── commands/           # Reusable command pipelines (execute-feature, dev-cycle, etc.)
-├── skills/             # On-demand expertise units (SKILL.md + trigger self-invocation)
-├── tools/              # External resource registry (registry.md + integrations/ docs)
-├── standards/          # Engineering principles
-├── design-references/  # Pulled reference-design languages (Tier 4, human reconciliation)
-├── system-architecture.md  # Structural docs with freshness metadata
-├── project-context.md      # Project goals and constraints
-├── design-system.md        # UI/UX rules
-├── repair-system.md        # Error knowledge base
-├── planning/           # Task queue and project plan (with complexity tagging)
-├── memory/             # Decisions and lessons (with supersedes links)
-├── index/              # Repo map and dependency graph (auto-regenerable)
-├── testing/            # Test plan and results
-├── checkpoints/        # Session log (append-only) + in-progress (singular, overwritten)
-└── summaries/          # Development history
+src/
+├── app/                    # Next.js App Router pages
+│   ├── api/               # API routes
+│   │   ├── auth/         # Authentication endpoints
+│   │   ├── assets/       # Asset management endpoints
+│   │   ├── users/        # User management endpoints
+│   │   ├── approvals/    # Approval workflow endpoints
+│   │   └── audit-logs/   # Audit trail endpoints
+│   ├── auth/             # Auth pages (login)
+│   ├── dashboard/        # Main dashboard
+│   ├── assets/           # Asset pages
+│   ├── users/            # User management pages
+│   ├── approvals/        # Approval pages
+│   ├── audit-logs/       # Audit log pages
+│   └── admin/            # Admin panel
+├── components/
+│   ├── ui/               # Reusable UI components
+│   ├── forms/            # Form components
+│   ├── tables/           # Table components
+│   └── layout/           # Layout components (sidebar, header)
+├── lib/
+│   ├── prisma.ts         # Prisma client singleton
+│   ├── auth.ts           # Auth utilities
+│   ├── audit.ts          # Audit logging
+│   └── utils.ts          # Utility functions
+└── types/                # TypeScript types
+
+prisma/
+├── schema.prisma         # Database schema
+└── seed.ts              # Database seeding
 ```
 
-### `ai-context.md` — Session entry point
+## Key Features Implementation
 
-The first file any AI agent reads to get a 30-second project orientation. Also records the installed `ai-system` version (the baseline for `pull-template-update.md`).
+### Asset Management
+- CRUD operations for assets
+- Asset assignment and return workflows
+- Accessory tracking with unique IDs
+- Asset condition tracking (New, Good, Fair, Damaged)
+- Status management (Available, Assigned, Maintenance, Retired, Damaged, Lost)
 
-### `integrations/examples/tool-integration.md` — Optional integration example
+### Approval Chain
+- Multi-level approval workflows
+- HR approval for all asset requests
+- IT approval for IT assets and accessories
+- Compliance approval for high-value assets (>₦100,000)
+- Priority-based processing (Low, Medium, High, Urgent)
 
-Non-normative example of wiring an AI tool to `ai-system`. Keep tool-specific config out of the core kit.
+### Audit Trail
+- Automatic logging of all state-changing operations
+- Captures: actor, timestamp, entity, before/after state, description
+- Filterable by entity type, action, actor, date range
+- Compliance-ready audit reports
 
-### `VERSION` + `CHANGELOG.md` — Versioning
+### User Management
+- Superadmin user invitation with department/role assignment
+- Department-based organization (HR, IT, Compliance, Finance, Operations, Marketing, Sales)
+- Role hierarchy with specific permissions
+- Employee ID tracking and campus location
 
-`VERSION` records the installed kit version; `CHANGELOG.md` lists what changed between releases. Together they make `pull-template-update.md` (diff-based, never silent overwrite) work.
+### Asset Custody & Acknowledgement
+- Digital acknowledgement statements
+- Standardized custody agreement text
+- Signature capture (typed name)
+- Witness support
+- Audit trail integration
 
-### `MIGRATION.md` + `V2_TO_V3_MIGRATION.md` — Upgrade guides
-
-`MIGRATION.md` covers upgrading existing projects from `ai-system` v1 to v2; `V2_TO_V3_MIGRATION.md` covers v2 to v3.
-
-### `.github/workflows/opencode.yml` — Opencode local trigger
-
-Enables running opencode agents directly from issue comments and PR review comments using `/oc`, `/opencode`, `/design`, `/od`, and `/opendesign` commands. Delegates to the central workflow runner in the [sotonye-dagogo-dev/github-workflows](https://github.com/sotonye-dagogo-dev/github-workflows) repository.
-
----
-
-## How to Use This Template
-
-### 1. Create a Repository from This Template
-
-Click **"Use this template"** on GitHub to create a new repository.
-
-### 2. Clone and Bootstrap
+## Scripts
 
 ```bash
-git clone <your-new-repo-url>
-cd <your-repo>
+npm run dev          # Start development server
+npm run build        # Build for production
+npm run start        # Start production server
+npm run lint         # Run ESLint
+npm run typecheck    # Run TypeScript type checking
+npm run db:generate  # Generate Prisma client
+npm run db:push      # Push schema to database
+npm run db:migrate   # Run migrations
+npm run db:studio    # Open Prisma Studio
+npm run db:seed      # Seed database with sample data
 ```
-
-Then, in your AI tool, run the bootstrap command:
-
-```
-Execute command: ai-system/commands/bootstrap-project.md
-Directive: [describe your project, e.g., "Next.js + Node.js marketplace app"]
-```
-
-### 3. Start Development
-
-```
-Execute command: ai-system/commands/dev-cycle.md
-```
-
-### 4. Pull Future Template Updates (Optional)
-
-```
-Execute command: ai-system/commands/pull-template-update.md
-```
-
-Compares the installed kit version against the upstream template's `VERSION`, then proposes a diff-based merge — it never silently overwrites locally customized files.
-
-### 5. Use Opencode (Optional)
-
-Comment `/oc` on any issue or PR to trigger an opencode agent session via the configured workflow.
-
----
-
-## Prerequisites & Suggestions
-
-- **GitHub Organization**: For teams, set up an org-level secrets and environments to share across repos using this template.
-- **Repository Secrets**: If using the opencode workflow, ensure `GITHUB_TOKEN` has the necessary permissions (contents write, pull requests write, issues write).
-- **AI Tool**: Any AI coding tool that can read `ai-context.md` at session start (CLI, IDE extension, API loop, or autonomous agent).
-- **GitHub Workflows Repo**: The opencode trigger workflow references `sotonye-dagogo-dev/github-workflows`. Ensure this repository is accessible within your org, or update the workflow reference accordingly.
-
----
-
-## References
-
-- **`ai-system` Framework Docs**: See [Sotonye0808/ai-system-template](https://github.com/Sotonye0808/ai-system-template) for the canonical `ai-system` documentation and philosophy.
-- **Opencode Workflows**: See [sotonye-dagogo-dev/github-workflows](https://github.com/sotonye-dagogo-dev/github-workflows) for the central workflow runners.
-
----
 
 ## License
 
-See [LICENSE](./LICENSE).
+MIT

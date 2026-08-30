@@ -1,0 +1,282 @@
+// Prisma Schema for Asset Management Platform
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  SUPERADMIN
+  ADMIN
+  HR_OFFICER
+  HR_HEAD
+  IT_OFFICER
+  IT_HEAD
+  COMPLIANCE_OFFICER
+  COMPLIANCE_HEAD
+  EMPLOYEE
+}
+
+enum Department {
+  HR
+  IT
+  COMPLIANCE
+  FINANCE
+  OPERATIONS
+  MARKETING
+  SALES
+  OTHER
+}
+
+enum AssetStatus {
+  AVAILABLE
+  ASSIGNED
+  MAINTENANCE
+  RETIRED
+  DAMAGED
+  LOST
+}
+
+enum AssetCategory {
+  LAPTOP
+  PHONE
+  TABLET
+  MONITOR
+  DOCKING_STATION
+  CHARGER
+  KEYBOARD
+  MOUSE
+  HEADSET
+  CARRYING_CASE
+  OTHER
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  ESCALATED
+}
+
+enum ApprovalType {
+  ASSET_REQUEST
+  ASSET_RETURN
+  ASSET_TRANSFER
+  ACCESSORY_REQUEST
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  ASSIGN
+  UNASSIGN
+  TRANSFER
+  RETURN
+  APPROVE
+  REJECT
+  ACKNOWLEDGE
+  MAINTENANCE
+  RETIRE
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  firstName     String
+  lastName      String
+  employeeId    String?   @unique
+  jobTitle      String?
+  department    Department @default(OTHER)
+  role          UserRole  @default(EMPLOYEE)
+  campus        String?
+  supervisorId  String?
+  supervisor    User?     @relation("Supervision", fields: [supervisorId], references: [id])
+  subordinates  User[]    @relation("Supervision")
+  isActive      Boolean   @default(true)
+  invitedById   String?
+  invitedBy     User?     @relation("Invitation", fields: [invitedById], references: [id])
+  invitedUsers  User[]    @relation("Invitation")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastLoginAt   DateTime?
+  
+  // Relations
+  assignedAssets       Asset[]        @relation("AssetAssignee")
+  issuedAssets         Asset[]        @relation("AssetIssuer")
+  createdAssets        Asset[]        @relation("AssetCreator")
+  approvals            Approval[]     @relation("ApprovalActor")
+  currentApprovals     Approval[]     @relation("CurrentApprover")
+  auditLogs            AuditLog[]
+  acknowledgements     Acknowledgement[]
+  witnessedAcknowledgements Acknowledgement[] @relation("AckWitness")
+  sentTransfers        AssetTransfer[] @relation("TransferFrom")
+  receivedTransfers    AssetTransfer[] @relation("TransferTo")
+  approvedTransfers    AssetTransfer[] @relation("TransferApprover")
+  
+  @@index([email])
+  @@index([department])
+  @@index([role])
+  @@index([supervisorId])
+}
+
+model Asset {
+  id              String        @id @default(cuid())
+  assetId         String        @unique // Human-readable ID like "AST-001"
+  category        AssetCategory
+  name            String
+  brand           String
+  model           String
+  serialNumber    String?       @unique
+  specifications  String?       // JSON string for RAM, Processor, etc.
+  condition       String?       // NEW, GOOD, FAIR, DAMAGED
+  status          AssetStatus   @default(AVAILABLE)
+  purchaseDate    DateTime?
+  purchasePrice   Float?
+  warrantyExpiry  DateTime?
+  location        String?       // Campus/Location
+  remarks         String?
+  
+  // Assignment
+  assignedToId    String?
+  assignedTo      User?         @relation("AssetAssignee", fields: [assignedToId], references: [id])
+  assignedAt      DateTime?
+  assignedById    String?
+  assignedBy      User?         @relation("AssetIssuer", fields: [assignedById], references: [id])
+  expectedReturnDate DateTime?
+  
+  // Accessories (self-referential for accessories attached to main asset)
+  parentAssetId   String?
+  parentAsset     Asset?        @relation("AssetAccessories", fields: [parentAssetId], references: [id])
+  accessories     Asset[]       @relation("AssetAccessories")
+  
+  // Accessory unique ID for reassignment tracking
+  accessoryId     String?       @unique // For accessories: "ACC-CHR-001"
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  createdById     String?
+  createdBy       User?         @relation("AssetCreator", fields: [createdById], references: [id])
+  
+  // Relations
+  approvals         Approval[]
+  acknowledgements  Acknowledgement[]
+  transfers         AssetTransfer[]
+  
+  @@index([assetId])
+  @@index([category])
+  @@index([status])
+  @@index([assignedToId])
+  @@index([parentAssetId])
+  @@index([accessoryId])
+}
+
+model AssetTransfer {
+  id              String      @id @default(cuid())
+  assetId         String
+  asset           Asset       @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  fromUserId      String?
+  fromUser        User?       @relation("TransferFrom", fields: [fromUserId], references: [id])
+  toUserId        String
+  toUser          User        @relation("TransferTo", fields: [toUserId], references: [id])
+  transferDate    DateTime    @default(now())
+  reason          String?
+  condition       String?
+  notes           String?
+  approvedById    String?
+  approvedBy      User?       @relation("TransferApprover", fields: [approvedById], references: [id])
+  approvedAt      DateTime?
+  
+  @@index([assetId])
+  @@index([fromUserId])
+  @@index([toUserId])
+}
+
+model Approval {
+  id              String        @id @default(cuid())
+  type            ApprovalType
+  status          ApprovalStatus @default(PENDING)
+  requesterId     String
+  requester       User          @relation("ApprovalActor", fields: [requesterId], references: [id])
+  assetId         String?
+  asset           Asset?        @relation(fields: [assetId], references: [id])
+  accessoryIds    String[]      // Array of accessory IDs
+  currentApproverId String?
+  currentApprover User?         @relation("CurrentApprover", fields: [currentApproverId], references: [id])
+  approvalChain   Json          // JSON: [{role: "HR_HEAD", userId: "xxx", order: 1, status: "PENDING"}]
+  priority        Int           @default(1) // 1=low, 2=medium, 3=high, 4=urgent
+  reason          String?
+  comments        String?
+  requestedAt     DateTime      @default(now())
+  decidedAt       DateTime?
+  expiresAt       DateTime?
+  
+  @@index([requesterId])
+  @@index([assetId])
+  @@index([status])
+  @@index([currentApproverId])
+}
+
+model Acknowledgement {
+  id              String      @id @default(cuid())
+  userId          String
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assetId         String
+  asset           Asset       @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  type            String      // "ISSUE", "RETURN", "TRANSFER", "DAMAGE_REPORT"
+  statement       String      // The acknowledgement text
+  agreed          Boolean     @default(false)
+  agreedAt        DateTime?
+  signedStatement String?     // Digital signature or typed name
+  witnessId       String?
+  witness         User?       @relation("AckWitness", fields: [witnessId], references: [id])
+  createdAt       DateTime    @default(now())
+  
+  @@index([userId])
+  @@index([assetId])
+  @@index([type])
+}
+
+model AuditLog {
+  id              String      @id @default(cuid())
+  actorId         String
+  actor           User        @relation(fields: [actorId], references: [id])
+  action          AuditAction
+  entityType      String      // "Asset", "User", "Approval", "Acknowledgement", "AssetTransfer"
+  entityId        String
+  beforeState     Json?       // Previous state
+  afterState      Json?       // New state
+  description     String
+  ipAddress       String?
+  userAgent       String?
+  metadata        Json?       // Additional context
+  createdAt       DateTime    @default(now())
+  
+  @@index([actorId])
+  @@index([entityType, entityId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model AccessoryType {
+  id          String   @id @default(cuid())
+  name        String   @unique // "Charger", "Keyboard", "Mouse", "Headset", "Carrying Case", "Docking Station"
+  code        String   @unique // "CHR", "KEY", "MOU", "HED", "CAS", "DOC"
+  description String?
+  isActive    Boolean  @default(true)
+  
+  @@index([code])
+}
+
+model SystemConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  category  String   // "approval", "notification", "asset", "general"
+  description String?
+  updatedAt DateTime @updatedAt
+}
