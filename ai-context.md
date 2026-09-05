@@ -3,8 +3,8 @@
 > **Metadata**
 >
 > - last-updated-by: bootstrap-project
-> - last-verified-against-code: (set on first run)
-> - installed-ai-system-version: [set by bootstrap-project from the kit VERSION — the baseline for pull-template-update]
+> - last-verified-against-code: 2026-08-29
+> - installed-ai-system-version: 1.0.0
 > - staleness-policy: re-verify before trusting if project structure has changed
 
 > **Overview:** Project overview — the very first file any AI agent should read. Provides a 30-second orientation to what this project is, what stack it uses, and where to find everything.
@@ -15,22 +15,30 @@
 
 | Field            | Value                             |
 | ---------------- | --------------------------------- |
-| Project Name     | [name]                            |
-| Type             | [e.g. Web App / API / Mobile App] |
-| Primary Language | [e.g. TypeScript]                 |
-| Frontend         | [e.g. Next.js 14]                 |
-| Backend          | [e.g. Node.js + Express]          |
-| Database         | [e.g. PostgreSQL]                 |
-| Styling          | [e.g. Tailwind CSS + Ant Design]  |
-| Deployment       | [e.g. Vercel + Railway]           |
+| Project Name     | Asset Management Platform         |
+| Type             | Web Application                   |
+| Primary Language | TypeScript                        |
+| Frontend         | Next.js 14 (App Router)           |
+| Backend          | Next.js API Routes + Prisma       |
+| Database         | PostgreSQL                        |
+| Styling          | Tailwind CSS                      |
+| Deployment       | Vercel / Docker                   |
 
 ---
 
 ## Key Modules
 
-| Module   | Location | Purpose        |
-| -------- | -------- | -------------- |
-| [module] | [path]   | [what it does] |
+| Module           | Location                    | Purpose                                       |
+| ---------------- | --------------------------- | --------------------------------------------- |
+| Authentication   | `src/lib/auth.ts`           | JWT auth, password hashing, session management |
+| Database         | `src/lib/prisma.ts`         | Prisma client singleton                       |
+| Audit Logging    | `src/lib/audit.ts`          | Automatic audit trail for state changes       |
+| Asset Management | `src/app/api/assets/`       | Asset CRUD, assignment, return, accessories   |
+| User Management  | `src/app/api/users/`        | User CRUD, roles, departments, invitations    |
+| Approvals        | `src/app/api/approvals/`    | Multi-level approval workflows                |
+| Audit Logs       | `src/app/api/audit-logs/`   | Compliance audit trail retrieval              |
+| UI Components    | `src/components/ui/`        | Reusable design system components             |
+| Layout           | `src/components/layout/`    | Dashboard layout, sidebar, header             |
 
 ---
 
@@ -48,4 +56,4 @@ Two catalogs worth knowing exist (read on demand, not up front):
 
 ## Active Development Focus
 
-[1–2 sentences about what is currently being built or fixed]
+Building the MVP of an Asset Management Platform to replace manual Excel/PDF-based tracking. Core features: asset lifecycle management, accessory tracking with unique IDs, multi-department approval chains (HR, IT, Compliance), comprehensive audit trails, and role-based access control with Superadmin user invitation capabilities.

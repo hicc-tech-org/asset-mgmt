@@ -1,50 +1,46 @@
-# In-Progress Work
+# In Progress
 
 > **Metadata**
->
-> - last-updated-by: (set by whichever command is running)
-> - last-verified-against-code: (set on write)
-> - staleness-policy: this file is overwritten every session — always current
+> - last-updated-by: bootstrap-project
+> - last-verified-against-code: 2026-08-29
+> - staleness-policy: update at start/end of each session
 
-> **Overview:** Tracks work that is currently in progress but not yet complete. Written _before_ starting risky multi-step work, cleared on clean completion. This is the first file `resume-session.md` reads on interruption — it is the single source of truth for "what was half-done."
-
----
-
-## Current State
-
-**Status:** [ Not Started / In Progress / Suspended ]
-
-**Command Being Executed:**
-[command-name.md]
-
-**Directive / Task:**
-[the original directive or task description]
-
-**Steps Completed:**
-
-- [step 1]
-- [step 2]
-
-**Current Step:**
-[what is being worked on right now]
-
-**Files Modified So Far:**
-
-- [file path] — [what changed]
-
-**Checkpoint Context:**
-[any state that must be preserved for the next session — variables, intermediate values, decisions made during this work]
-
-**Last Tool Output / Error:**
-[if the session was interrupted mid-operation, what was the last thing that happened]
+> **Overview:** Current work state for session continuity.
 
 ---
 
-## Drift Check
+## Current Session
 
-**Last verified against repo:** [timestamp]
-**Any known drift between ai-system docs and actual code:** [yes/no — describe]
+**Status**: Project bootstrap complete, ready for dependency installation and database setup
+
+**Active Task**: None (awaiting `npm install` and database configuration)
+
+**Next Steps**:
+1. Run `npm install` to install dependencies
+2. Copy `.env.example` to `.env` and configure DATABASE_URL
+3. Run `npm run db:generate` to generate Prisma client
+4. Run `npm run db:push` to create database schema
+5. Run `npm run db:seed` to populate with test data
+6. Run `npm run dev` to start development server
+7. Verify login and core functionality
 
 ---
 
-_This file is overwritten on every new in-progress operation. Clear on clean completion._
+## Blockers
+
+- None
+
+---
+
+## Recent Commits
+
+*None yet — initial commit pending*
+
+---
+
+## Open Questions
+
+1. Database hosting: Local PostgreSQL, Docker, or cloud (Neon, Supabase, Railway)?
+2. Email service: SendGrid, Resend, or SMTP for notifications?
+3. File storage: Local, S3, or Vercel Blob for future asset images?
+4. Deployment target: Vercel, Docker (Railway/Render), or self-hosted?
