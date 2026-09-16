@@ -1,8 +1,8 @@
 # Architecture History
 
 > **Metadata**
-> - last-updated-by: bootstrap-project
-> - last-verified-against-code: 2026-08-29
+> - last-updated-by: update-ai-system
+> - last-verified-against-code: 2026-09-16
 > - staleness-policy: append-only, never remove entries
 
 > **Overview:** Chronological record of significant architectural decisions and changes.
@@ -48,6 +48,30 @@
 - Universal component catalog (Button, Input, Card, Table, Badge, Select, Textarea, Tabs)
 - Audit trails on all mutations
 - Soft deletes for users, hard deletes for assets (SuperAdmin only)
+
+---
+
+## 2026-09-16 — Edge/Build Hardening (Sprint 2.1)
+
+**Decision**: Split auth verification by runtime + make build Vercel-aware
+
+**Context**: Vercel build failure on `Collecting page data for /api/approvals/[id]` (`PrismaClientInitializationError` — cached deps without `prisma generate`) and Edge Runtime warnings from importing Node-only `bcryptjs`/`jsonwebtoken` into middleware.
+
+**Alternatives Considered**:
+- Keep `jsonwebtoken` in middleware with polyfills — Rejected: Edge Runtime explicitly bans `process.nextTick`/`setImmediate`/`process.version`; polyfilling is brittle.
+- `next-auth` — Rejected: Custom JWT + HttpOnly cookies already ship; migration cost outweighs benefit for MVP.
+- Move middleware to Node runtime — Rejected: Middleware must run on Edge per Next.js; Node runtime defeats intended latency/protection.
+
+**Outcome**: 
+- `package.json:scripts.build = "prisma generate && next build"` + `postinstall = "prisma generate"` (fixes Vercel cache per https://pris.ly/d/vercel-build)
+- `src/middleware.ts` now `async` + `jose:jwtVerify` (Edge-compatible), isolated from `src/lib/auth.ts` (Node-only: bcryptjs + jsonwebtoken)
+- `jose@5.6.3` added; both runtimes share `JWT_SECRET` (TextEncoder-encoded in Edge)
+- `src/app/api/approvals/[id]/route.ts` uses `await params` (Next.js 14 async params) — verified compatible
+
+**Patterns Established**:
+- Edge/Node boundary documented in `index/dependency-graph.md` and `system-architecture.md`
+- Build must include `prisma generate` (verification CLI updated)
+- Drift: Next.js 14.2.0 CVE remains open; ESLint exhaustive-deps warnings remain open
 
 ---
 

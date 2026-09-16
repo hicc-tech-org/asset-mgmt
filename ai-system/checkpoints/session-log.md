@@ -1,8 +1,8 @@
 # Session Log
 
 > **Metadata**
-> - last-updated-by: bootstrap-project
-> - last-verified-against-code: 2026-08-29
+> - last-updated-by: update-ai-system
+> - last-verified-against-code: 2026-09-16
 > - staleness-policy: append-only, new sessions at top
 
 > **Overview:** Chronological log of development sessions.
@@ -59,3 +59,26 @@
 **Files Created**: ~60 files
 
 **Next Session**: Install dependencies, configure database, run seed, verify functionality
+
+---
+
+## 2026-09-16 — Build Hardening (fix-build + update-ai-system deep sync)
+
+**Agent**: update-ai-system / fix-build follow-up
+
+**Duration**: Single session (deep sync)
+
+**Summary**: Deep synchronization after Vercel deploy failure. Audited all `ai-system/` docs against repo state, corrected Edge/Prisma build drift, and flagged open security/lint debt.
+
+**Actions**:
+1. Audited Vercel build log `iad1 2026-09-16 09:42:30–09:43:10` — confirmed `PrismaClientInitializationError` and Edge warnings root causes
+2. Applied fix-build PR #5: `package.json` build/postinstall + `src/middleware.ts` → `jose:jwtVerify` (a46f4b8)
+3. Updated `ai-system/index/repo-map.md` (Edge split, build scripts, drift notes), `ai-system/index/dependency-graph.md` (jose, Edge/Node split, build deps), `ai-system/system-architecture.md` (architecture diagram, module breakdown, config points, verification CLI, tech stack, discrepancy report, constraints)
+4. Updated `ai-system/planning/project-plan.md` (Phase 3.5 hardening) and `ai-system/planning/task-queue.md` (Sprint 2.1 T048–T052)
+5. Appended `ai-system/summaries/dev-history.md` Sprint 2026-09-16 entry and `ai-system/memory/lessons-learned.md` (Vercel/Edge, Config discipline)
+6. Appended `ai-system/memory/architecture-history.md` 2026-09-16 entry
+7. Synchronized freshness headers across 8 docs; queued open debt: Next.js CVE, exhaustive-deps, eslint/glob deprecations
+
+**Files Updated**: 9 ai-system docs + metadata headers
+
+**Next Session**: Upgrade Next.js to patched version; fix lint warnings; proceed with Phase 3 secondary features

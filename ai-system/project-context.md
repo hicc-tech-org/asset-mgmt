@@ -1,8 +1,8 @@
 # Project Context
 
 > **Metadata**
-> - last-updated-by: bootstrap-project
-> - last-verified-against-code: 2026-08-29
+> - last-updated-by: update-ai-system
+> - last-verified-against-code: 2026-09-16
 > - staleness-policy: re-verify if >10 sessions old or after major scope changes
 
 > **Overview:** Why this project exists, who it serves, and what constraints govern development. Agents should read this to understand the "why" behind the work.
@@ -41,9 +41,9 @@ Asset Management Platform to replace the client's manual Excel/PDF-based asset t
 
 ## Current Project Phase
 
-Phase: Active Development
+Phase: Active Development — MVP core complete; hardening sprint done
 
-Active sprint focus: Building MVP with core asset management, approval workflows, audit trails, and user management
+Active sprint focus: MVP core (Phase 1–2) complete and Vercel-deployable after 2026-09-16 build hardening (Prisma generate + jose Edge fix). Next: security upgrade (Next.js CVE), lint fixes, then Phase 3 secondary features.
 
 ---
 
@@ -55,9 +55,10 @@ Active sprint focus: Building MVP with core asset management, approval workflows
 | Prisma ORM | Type-safe database access with excellent TypeScript integration |
 | PostgreSQL | Robust relational database for complex relationships and audit trails |
 | Tailwind CSS | Utility-first styling with design token support |
-| JWT in HttpOnly cookies | Secure authentication without localStorage exposure |
+| JWT in HttpOnly cookies | Secure authentication without localStorage exposure — Node: jsonwebtoken/bcryptjs; Edge: jose (jwtVerify) |
 | React Hook Form + Zod | Performant forms with schema validation |
 | Custom UI components | Full control over design system, no external dependencies |
+| Prisma generate at build | Required on Vercel (`build` + `postinstall`) to avoid cached-client `PrismaClientInitializationError` |
 
 ---
 

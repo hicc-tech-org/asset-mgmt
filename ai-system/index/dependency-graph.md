@@ -1,8 +1,8 @@
 # Dependency Graph
 
 > **Metadata**
-> - last-updated-by: bootstrap-project
-> - last-verified-against-code: 2026-08-29
+> - last-updated-by: update-ai-system
+> - last-verified-against-code: 2026-09-16
 > - staleness-policy: re-verify after significant architectural changes
 
 > **Overview:** Module relationships as text diagram.
@@ -23,10 +23,13 @@ src/app (pages & API routes)
     ├──→ src/lib/prisma.ts (Prisma Client)
     │       └──→ @prisma/client
     │
-    ├──→ src/lib/auth.ts
+    ├──→ src/lib/auth.ts (Node runtime only)
     │       ├──→ bcryptjs
     │       ├──→ jsonwebtoken
     │       └──→ next/headers (cookies)
+    │
+    ├──→ src/middleware.ts (Edge Runtime — isolated)
+    │       └──→ jose (jwtVerify) — Edge-compatible, no bcryptjs/jsonwebtoken
     │
     ├──→ src/lib/audit.ts
     │       └──→ src/lib/prisma.ts
@@ -37,6 +40,8 @@ src/app (pages & API routes)
             ├──→ date-fns
             └──→ lucide-react
 ```
+
+> **Edge/Node split (drift fixed 2026-09-16):** `src/middleware.ts` no longer imports `src/lib/auth.ts`. Previous import caused Edge warnings (`process.nextTick`, `setImmediate`, `process.version`). `src/lib/auth.ts` stays Node-only; middleware uses `jose` independently with shared `JWT_SECRET` env.
 
 ---
 
@@ -96,9 +101,16 @@ src/app/api/approvals/route.ts (GET, POST)
 
 src/app/api/approvals/[id]/route.ts (PATCH)
     ├──→ src/lib/prisma.ts
-    ├──→ src/lib/auth.ts
+    ├──→ src/lib/auth.ts (verifyToken Node) + Prisma.Json handling
     ├──→ src/lib/audit.ts
     └──→ @prisma/client (Approval, User, Asset, Acknowledgement)
+
+src/middleware.ts (Edge, async)
+    ├──→ jose (jwtVerify)
+    ├──→ next/server (NextRequest, NextResponse)
+    └──→ env:JWT_SECRET (TextEncoder-encoded key, shared with src/lib/auth.ts)
+    └──→ Sets x-user-* headers for API routes; publicPaths: /auth/login, /auth/register, /api/auth
+
 
 src/app/api/audit-logs/route.ts (GET)
     ├──→ src/lib/prisma.ts
@@ -227,16 +239,21 @@ AdminPage
 ## External Dependencies
 
 ### Runtime
-- `next` — Framework
+- `next` — Framework (14.2.0 pinned; note security advisory — see discrepancy report)
 - `react`, `react-dom` — UI
 - `@prisma/client` — Database client
-- `bcryptjs` — Password hashing
-- `jsonwebtoken` — JWT tokens
+- `bcryptjs` — Password hashing (Node-only, not Edge)
+- `jsonwebtoken` — JWT tokens (Node-only, API routes; not Edge)
+- `jose` — JWT verification in Edge middleware (5.6.3, added 2026-09-16)
 - `zod` — Validation schemas
 - `date-fns` — Date formatting
 - `clsx`, `tailwind-merge` — Class composition
 - `lucide-react` — Icons
 - `react-hook-form`, `@hookform/resolvers/zod` — Forms
+
+### Build
+- `prisma generate` now part of `build` and `postinstall` (Vercel cache fix 2026-09-16; pre-fails with `PrismaClientInitializationError` during `Collecting page data` otherwise)
+- `next build` — Compiled successfully with Edge warnings removed post-jose migration (remaining lint warnings suppressed/flagged)
 
 ### Development
 - `typescript` — Type checking
