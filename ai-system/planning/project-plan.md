@@ -1,8 +1,8 @@
 # Project Plan
 
 > **Metadata**
-> - last-updated-by: bootstrap-project
-> - last-verified-against-code: 2026-08-29
+> - last-updated-by: update-ai-system
+> - last-verified-against-code: 2026-09-16
 > - staleness-policy: re-verify if project scope or phase changes
 
 > **Overview:** High-level feature checklist organized by development phase. See `planning/task-queue.md` for granular, sprint-level tasks.
@@ -55,6 +55,16 @@
 
 ---
 
+## Phase 3.5 — Build & Deploy Hardening (Added 2026-09-16)
+
+- [x] Fix Vercel build: add `prisma generate` to `build` + `postinstall` (PrismaClientInitializationError)
+- [x] Fix Edge Runtime: migrate `src/middleware.ts` to `jose:jwtVerify` (remove bcryptjs/jsonwebtoken Node APIs from Edge)
+- [ ] Upgrade Next.js 14.2.0 to patched version (security vulnerability https://nextjs.org/blog/security-update-2025-12-11)
+- [ ] Fix ESLint warnings: `react-hooks/exhaustive-deps` in approvals/assets/audit-logs/users pages
+- [ ] Upgrade ESLint 8.56 + glob deprecations
+
+---
+
 ## Phase 4 — Quality & Polish
 
 - [ ] Unit test coverage for core modules (lib, API routes)
@@ -83,10 +93,12 @@
 
 - [x] Project initialization and AI system setup
 - [x] Database schema with all required models
-- [x] Authentication and authorization system
+- [x] Authentication and authorization system (Node: bcryptjs/jsonwebtoken; Edge: jose)
 - [x] Core asset management features
 - [x] Approval workflow engine
 - [x] Audit trail implementation
 - [x] User management with RBAC
 - [x] Dashboard and main navigation
 - [x] UI component library
+- [x] Vercel deploy fix (Prisma generate) — 2026-09-16
+- [x] Edge middleware fix (jose) — 2026-09-16

@@ -1,8 +1,8 @@
 # Repair System
 
 > **Metadata**
-> - last-updated-by: bootstrap-project
-> - last-verified-against-code: 2026-08-29
+> - last-updated-by: update-ai-system
+> - last-verified-against-code: 2026-09-16
 > - staleness-policy: re-verify when error patterns change
 
 > **Overview:** Known error patterns and their fixes for this codebase. Used by `commands/fix-build.md`.
@@ -21,6 +21,50 @@ npm run db:generate
 ```
 
 **Prevention**: Run after any schema.prisma changes
+
+---
+
+### Vercel: PrismaClientInitializationError — Vercel Build Cache
+
+**Error**:
+```
+Prisma has detected that this project was built on Vercel, which caches dependencies. This leads to an outdated Prisma Client because Prisma's auto-generation isn't triggered.
+PrismaClientInitializationError ... at .../node_modules/@prisma/client/runtime/library.js:34:69
+Build error occurred — Error: Failed to collect page data for /api/approvals/[id]
+```
+
+**Cause**: Vercel caches `node_modules`; `prisma generate` not run on cached build.
+
+**Fix** (applied 2026-09-16, PR #5):
+```json
+// package.json
+"scripts": {
+  "build": "prisma generate && next build",
+  "postinstall": "prisma generate"
+}
+```
+Reference: https://pris.ly/d/vercel-build
+
+**Prevention**: Keep `build` and `postinstall` as above; CI must run `npm run build` locally before merge.
+
+---
+
+### Edge Runtime — Node APIs Not Supported
+
+**Error** (build warnings, then runtime risk):
+```
+A Node.js API is used (process.nextTick / setImmediate / process.version) which is not supported in the Edge Runtime.
+Import trace: ./node_modules/bcryptjs/dist/bcrypt.js -> ./src/lib/auth.ts
+Import trace: ./node_modules/jsonwebtoken/... -> ./src/lib/auth.ts
+```
+
+**Cause**: `src/middleware.ts` imported `src/lib/auth.ts` which transitively pulls `bcryptjs`/`jsonwebtoken` (Node-only).
+
+**Fix** (applied 2026-09-16):
+- `src/middleware.ts` now imports `jose:jwtVerify` (Edge-compatible), `async` middleware, `TextEncoder.encode(JWT_SECRET)` shared key.
+- `src/lib/auth.ts` remains Node-only (API routes only).
+
+**Prevention**: Middleware must not import `src/lib/auth.ts`; lint/review rule: "Edge must use `jose`, Node must use `jsonwebtoken`/`bcryptjs`".
 
 ---
 

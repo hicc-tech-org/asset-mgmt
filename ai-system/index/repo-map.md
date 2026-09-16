@@ -1,8 +1,8 @@
 # Repo Map
 
 > **Metadata**
-> - last-updated-by: bootstrap-project
-> - last-verified-against-code: 2026-08-29
+> - last-updated-by: update-ai-system
+> - last-verified-against-code: 2026-09-16
 > - staleness-policy: re-verify if folder structure changes
 
 > **Overview:** Folder structure with purpose of each directory.
@@ -21,10 +21,14 @@ asset-mgmt/
 ├── .gitignore
 ├── next.config.js
 ├── package.json
+├── package-lock.json
 ├── postcss.config.js
 ├── tailwind.config.ts
 ├── tsconfig.json
-└── README.md
+├── README.md
+├── VERSION                   # Installed AI system version marker
+├── MIGRATION.md / V2_TO_V3_MIGRATION.md / CHANGELOG.md
+└── cookies.txt               # Dev-only auth cookie dump (ignored in prod)
 ```
 
 ---
@@ -140,7 +144,7 @@ src/
 │   │   │   └── [id]/route.ts         # GET, PATCH, DELETE
 │   │   ├── approvals/
 │   │   │   ├── route.ts              # GET list, POST create
-│   │   │   └── [id]/route.ts         # PATCH approve/reject
+│   │   │   └── [id]/route.ts         # PATCH approve/reject (async params)
 │   │   └── audit-logs/
 │   │       └── route.ts              # GET with filters
 │   ├── auth/
@@ -185,13 +189,16 @@ src/
 │       ├── header.tsx
 │       └── dashboard-layout.tsx
 ├── lib/                              # Core utilities
-│   ├── prisma.ts                     # Prisma client
-│   ├── auth.ts                       # Auth utilities
+│   ├── prisma.ts                     # Prisma client singleton (globalThis guard)
+│   ├── auth.ts                       # Auth utilities (bcryptjs + jsonwebtoken, Node runtime)
 │   ├── audit.ts                      # Audit logging
 │   └── utils.ts                      # Common utilities
+├── middleware.ts                     # Edge middleware — MUST use jose (Edge-compatible), not jsonwebtoken/bcryptjs
 ├── types/                            # TypeScript types (future)
 └── hooks/                            # React hooks (future)
 ```
+
+> **Note:** `src/middleware.ts` is Edge Runtime. It was migrated from `src/lib/auth.ts:verifyToken` (jsonwebtoken) to `jose:jwtVerify` on 2026-09-16 to fix Vercel build warnings (`bcryptjs`/`jsonwebtoken` Node APIs not supported in Edge). `src/lib/auth.ts` remains Node-only for API routes; middleware must stay Edge-compatible.
 
 ---
 
@@ -204,6 +211,14 @@ src/
 | Dashboard | `src/app/dashboard/page.tsx` |
 | API routes | `src/app/api/*/route.ts` |
 | Database | `prisma/schema.prisma` |
-| Auth | `src/lib/auth.ts` |
+| Auth (Node) | `src/lib/auth.ts` |
+| Auth (Edge) | `src/middleware.ts` (jose) |
 | UI components | `src/components/ui/*` |
 | Layout | `src/components/layout/dashboard-layout.tsx` |
+| Build | `package.json:scripts.build` = `prisma generate && next build`; `postinstall` = `prisma generate` (Vercel cache fix) |
+
+## Drift Fixed 2026-09-16
+
+- Build: Added `prisma generate` to `build` and `postinstall` to fix `PrismaClientInitializationError: Prisma has detected that this project was built on Vercel...` observed in Vercel build `iad1` on 2026-09-16 (phase: Collecting page data for /api/approvals/[id]).
+- Edge: Middleware migrated to `jose:jwtVerify` (async) — decouples Edge from Node-only `jsonwebtoken`/`bcryptjs`. Previous build emitted warnings for `process.nextTick`, `setImmediate`, `process.version` in Edge Runtime.
+- Middleware is async and reads `auth-token` cookie + sets `x-user-*` headers for server components; `await params` pattern used in `src/app/api/approvals/[id]/route.ts` matches Next.js 14 async params.

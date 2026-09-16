@@ -1,8 +1,8 @@
 # Lessons Learned
 
 > **Metadata**
-> - last-updated-by: bootstrap-project
-> - last-verified-against-code: 2026-08-29
+> - last-updated-by: update-ai-system
+> - last-verified-against-code: 2026-09-16
 > - staleness-policy: append-only, never remove entries
 
 > **Overview:** Captured insights from development to avoid repeating mistakes and reinforce good practices.
@@ -93,6 +93,50 @@
 - Build form field wrapper component
 - Add toast system (sonner or custom)
 - Add modal component
+
+---
+
+## 2026-09-16 — Vercel Build & Edge Runtime
+
+**Lesson**: Vercel's dependency cache skips Prisma generation; Edge Runtime cannot import Node APIs.
+
+**Context**: Vercel build `iad1` 2026-09-16 09:42: `Collecting page data for /api/approvals/[id]` failed with `PrismaClientInitializationError: Prisma has detected that this project was built on Vercel...` plus Edge warnings (`process.nextTick`, `setImmediate`, `process.version`) from `bcryptjs`/`jsonwebtoken` via `src/lib/auth.ts` imported into `src/middleware.ts`.
+
+**What Worked**:
+- Adding `prisma generate` to both `build` (`prisma generate && next build`) and `postinstall` (`prisma generate`) satisfies Vercel's troubleshooting guidance (https://pris.ly/d/vercel-build) and local installs
+- Migrating middleware to `jose:jwtVerify` (async, Edge-compatible) cleanly separates Edge from Node auth. Shared `JWT_SECRET` via `TextEncoder` avoids config divergence. Middleware becoming `async` matches Next.js Edge expectation.
+- Build warnings disappeared post-migration; `✓ Compiled successfully` confirms fix
+
+**What Could Improve**:
+- Should have enforced Edge/Node boundary from day one (lint rule or code-review checklist: "middleware may not import src/lib/auth")
+- Should have followed Prisma + Vercel integration guide during bootstrap, not after first deploy failure
+- Pinned `next@14.2.0` without checking security advisories; should run `npm audit` / check Next.js security blog pre-deploy
+
+**Action Items**:
+- [x] Document Edge/Node split in `index/dependency-graph.md` and `system-architecture.md`
+- [ ] Add CI step: `npm run build` must pass before merge (catches Prisma/Edge issues early)
+- [ ] Upgrade Next.js 14.2.0 to patched version (CVE https://nextjs.org/blog/security-update-2025-12-11)
+- [ ] Upgrade `eslint@8.56.0` and `glob` to remove deprecation/vuln warns
+- [ ] Fix `react-hooks/exhaustive-deps` warnings (wrap fetchers in useCallback)
+- [ ] Add `npm audit` to quality gate
+
+---
+
+## 2026-09-16 — Config Fallback Discipline
+
+**Lesson**: JWT secrets must have a single source of truth across runtimes.
+
+**Context**: `src/lib/auth.ts` and `src/middleware.ts` both read `JWT_SECRET` with fallback `'your-super-secret-key-change-in-production'`. Edge uses `TextEncoder.encode()` while Node uses raw string for `jsonwebtoken`.
+
+**What Worked**:
+- Env-based config with fallback keeps dev workable; production enforces real secret via `.env`
+
+**What Could Improve**:
+- Fallback string value identical in both runtimes ensures tokens verify cross-runtime but is insecure if production forgets to set env
+
+**Action Items**:
+- [ ] Fail fast in production if `JWT_SECRET` is default/fallback (throw or warn prominently)
+- [ ] Document required env vars in README and `.env.example` with `min 32 chars` note already present
 
 ---
 
