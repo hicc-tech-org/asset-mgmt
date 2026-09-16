@@ -1,8 +1,8 @@
 # Lessons Learned
 
 > **Metadata**
-> - last-updated-by: bootstrap-project
-> - last-verified-against-code: 2026-08-29
+> - last-updated-by: update-ai-system
+> - last-verified-against-code: 2026-09-16
 > - staleness-policy: append-only, never remove entries
 
 > **Overview:** Captured insights from development to avoid repeating mistakes and reinforce good practices.
@@ -93,6 +93,75 @@
 - Build form field wrapper component
 - Add toast system (sonner or custom)
 - Add modal component
+
+---
+
+## 2026-09-16 — Vercel Build & Edge Runtime
+
+**Lesson**: Vercel's dependency cache skips Prisma generation; Edge Runtime cannot import Node APIs.
+
+**Context**: Vercel build `iad1` 2026-09-16 09:42: `Collecting page data for /api/approvals/[id]` failed with `PrismaClientInitializationError: Prisma has detected that this project was built on Vercel...` plus Edge warnings (`process.nextTick`, `setImmediate`, `process.version`) from `bcryptjs`/`jsonwebtoken` via `src/lib/auth.ts` imported into `src/middleware.ts`.
+
+**What Worked**:
+- Adding `prisma generate` to both `build` (`prisma generate && next build`) and `postinstall` (`prisma generate`) satisfies Vercel's troubleshooting guidance (https://pris.ly/d/vercel-build) and local installs
+- Migrating middleware to `jose:jwtVerify` (async, Edge-compatible) cleanly separates Edge from Node auth. Shared `JWT_SECRET` via `TextEncoder` avoids config divergence. Middleware becoming `async` matches Next.js Edge expectation.
+- Build warnings disappeared post-migration; `✓ Compiled successfully` confirms fix
+
+**What Could Improve**:
+- Should have enforced Edge/Node boundary from day one (lint rule or code-review checklist: "middleware may not import src/lib/auth")
+- Should have followed Prisma + Vercel integration guide during bootstrap, not after first deploy failure
+- Pinned `next@14.2.0` without checking security advisories; should run `npm audit` / check Next.js security blog pre-deploy
+
+**Action Items**:
+- [x] Document Edge/Node split in `index/dependency-graph.md` and `system-architecture.md`
+- [x] Upgrade Next.js 14.2.0 to patched version (CVE https://nextjs.org/blog/security-update-2025-12-11) — done 2026-09-16 follow-up: `next` 15.5.25 + `eslint-config-next` 15.5.25
+- [x] Upgrade `eslint@8.56.0` and `glob` to remove deprecation/vuln warns — done 2026-09-16 follow-up: `eslint` 9.31.0 flat config (`eslint.config.mjs` via FlatCompat)
+- [x] Fix `react-hooks/exhaustive-deps` warnings (wrap fetchers in useCallback) — done 2026-09-16 follow-up: `React.useCallback` in 4 pages, lint `✔ No warnings`
+- [ ] Add CI step: `npm run build` must pass before merge (catches Prisma/Edge/issues early — now also guards Next 15 async `cookies()` breaking change)
+- [ ] Add `npm audit` to quality gate
+
+---
+
+## 2026-09-16 — Next 15 / ESLint 9 Migration & Exhaustive-Deps (follow-up)
+
+**Lesson**: Major framework bumps (14→15) fix CVEs and deprecations but introduce breaking APIs (`cookies()` async) that must be codemodded together.
+
+**Context**: Follow-up to 2026-09-16 deep sync. Remaining issues: `next@14.2.0` CVE, `eslint@8.56.0` deprecated + `glob@7`/`glob@10` vulns (`@humanwhocodes/*` deprecated), and 4× `react-hooks/exhaustive-deps` warnings. Upgrading `next` to `15.5.25` to allow `eslint@9` (config-next 14 only peers `^8`) exposed Next 15 `cookies()` Promise breaking change.
+
+**What Worked**:
+- Choosing `next@15.5.25` over `14.2.35` patch: CVE fixed and unlocks `eslint@9` flat config without override hacks, while keeping React `18.2.0` (Next 15 supports `^18 || ^19`). Build `prisma generate && next build` passes (`✓ Compiled successfully`, 21 routes, middleware 39 kB).
+- `eslint 9.31.0` + `eslint-config-next 15.5.25` + `eslint.config.mjs` (FlatCompat `next/core-web-vitals`) removes all glob deprecation warnings; `next lint` now `✔ No ESLint warnings or errors` (previously 4 exhaustive-deps warnings). `FlatCompat` avoids full manual flat-config rewrite.
+- `react-hooks/exhaustive-deps`: wrapping `fetch*` in `React.useCallback` with explicit deps and making `useEffect` depend on the callback is the minimal non-looping fix (tested across `approvals/assets/audit-logs/users` pages: `src/app/approvals/page.tsx:43-65`, etc.).
+- `src/lib/auth.ts`: making `setAuthCookie`/`clearAuthCookie` `async` + `await cookies()` and updating `src/app/api/auth/{login,register,logout}/route.ts` to `await` fixes the `Promise<ReadonlyRequestCookies>` type error cleanly without touching `verifyToken`/`hashPassword` (still sync/Node-only).
+
+**What Could Improve**:
+- Should have anticipated Next 15 `cookies()` async codemod when bumping `next` major; `npm run typecheck` caught it (`Property 'set' does not exist on type 'Promise<ReadonlyRequestCookies>'`), but CI would have caught earlier.
+- `next lint` is deprecated in Next 15 — should migrate lint script to `eslint .` via `npx @next/codemod@canary next-lint-to-eslint-cli` in next sprint to future-proof.
+- `prisma@5.10.0`→`8.0.0-rc` major available but not upgraded — evaluate separately (migration + Accelerate considerations).
+
+**Action Items**:
+- [x] Document async `cookies()` pattern in `system-architecture.md` (Auth Node) and `index/repo-map.md`
+- [ ] Migrate `package.json:scripts.lint` from `next lint` to `eslint .` (requires flat config finalize + CI update)
+- [ ] Evaluate Prisma 5→8 major upgrade
+- [ ] Add `npm audit` pre-merge check
+
+---
+
+## 2026-09-16 — Config Fallback Discipline
+
+**Lesson**: JWT secrets must have a single source of truth across runtimes.
+
+**Context**: `src/lib/auth.ts` and `src/middleware.ts` both read `JWT_SECRET` with fallback `'your-super-secret-key-change-in-production'`. Edge uses `TextEncoder.encode()` while Node uses raw string for `jsonwebtoken`.
+
+**What Worked**:
+- Env-based config with fallback keeps dev workable; production enforces real secret via `.env`
+
+**What Could Improve**:
+- Fallback string value identical in both runtimes ensures tokens verify cross-runtime but is insecure if production forgets to set env
+
+**Action Items**:
+- [ ] Fail fast in production if `JWT_SECRET` is default/fallback (throw or warn prominently)
+- [ ] Document required env vars in README and `.env.example` with `min 32 chars` note already present
 
 ---
 

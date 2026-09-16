@@ -1,15 +1,15 @@
 # Task Queue
 
 > **Metadata**
-> - last-updated-by: bootstrap-project
-> - last-verified-against-code: 2026-08-29
+> - last-updated-by: update-ai-system
+> - last-verified-against-code: 2026-09-16
 > - staleness-policy: update after each sprint or when priorities shift
 
 > **Overview:** Granular, sprint-level tasks derived from `project-plan.md`. Tasks are ordered by priority and dependency.
 
 ---
 
-## Sprint 1 — Foundation (Current)
+## Sprint 1 — Foundation (Completed 2026-08-29)
 
 | ID | Task | Status | Assignee | Notes |
 |----|------|--------|----------|-------|
@@ -25,7 +25,7 @@
 
 ---
 
-## Sprint 2 — Core Features (Current)
+## Sprint 2 — Core Features (Completed 2026-08-29)
 
 | ID | Task | Status | Assignee | Notes |
 |----|------|--------|----------|-------|
@@ -77,15 +77,27 @@
 
 ---
 
+## Sprint 2.1 — Build Hardening (Completed 2026-09-16)
+
+| ID | Task | Status | Assignee | Notes |
+|----|------|--------|----------|-------|
+| T048 | Fix Vercel Prisma build (prisma generate) | ✅ Done | fix-build | `build`: `prisma generate && next build`, `postinstall`: `prisma generate`; fixes `PrismaClientInitializationError` |
+| T049 | Fix Edge Runtime auth (jose) | ✅ Done | fix-build | Migrated `src/middleware.ts` to `jose:jwtVerify` (async), decouples Edge from bcryptjs/jsonwebtoken |
+| T050 | Upgrade Next.js 14.2.0 (CVE) | ✅ Done | update-ai-system | Upgraded `next` + `eslint-config-next` to `15.5.25` (CVE https://nextjs.org/blog/security-update-2025-12-11); handled async cookies API |
+| T051 | Fix ESLint exhaustive-deps warnings | ✅ Done | update-ai-system | Wrapped fetchers in `React.useCallback`; `useEffect` now depends on callback — lint `✔ No warnings` |
+| T052 | Upgrade ESLint/glob deprecations | ✅ Done | update-ai-system | `eslint` `8.56.0` → `9.31.0`, `.eslintrc.js` → `eslint.config.mjs` (FlatCompat flat config); glob vuln removed |
+
+---
+
 ## Sprint 5 — Launch Prep
 
 | ID | Task | Status | Assignee | Notes |
 |----|------|--------|----------|-------|
 | T041 | Production Docker configuration | ⏳ Pending | — | Multi-stage build, health checks |
-| T042 | Security audit | ⏳ Pending | — | Dependencies, auth, input validation |
+| T042 | Security audit | ⏳ Pending | — | Dependencies, auth, input validation (includes Next.js CVE) |
 | T043 | API documentation (OpenAPI) | ⏳ Pending | — | Swagger/OpenAPI spec |
 | T044 | User documentation | ⏳ Pending | — | Admin guide, user guide |
-| T045 | Deployment pipeline | ⏳ Pending | — | GitHub Actions → Vercel/Docker |
+| T045 | Deployment pipeline | ✅ Partial | — | Vercel build fixed; GitHub Actions → Vercel works |
 | T046 | Monitoring setup | ⏳ Pending | — | Sentry, uptime monitoring |
 | T047 | Backup strategy | ⏳ Pending | — | Automated DB backups, restore test |
 

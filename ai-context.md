@@ -2,8 +2,8 @@
 
 > **Metadata**
 >
-> - last-updated-by: bootstrap-project
-> - last-verified-against-code: 2026-08-29
+> - last-updated-by: update-ai-system
+> - last-verified-against-code: 2026-09-16
 > - installed-ai-system-version: 1.0.0
 > - staleness-policy: re-verify before trusting if project structure has changed
 
@@ -30,8 +30,9 @@
 
 | Module           | Location                    | Purpose                                       |
 | ---------------- | --------------------------- | --------------------------------------------- |
-| Authentication   | `src/lib/auth.ts`           | JWT auth, password hashing, session management |
-| Database         | `src/lib/prisma.ts`         | Prisma client singleton                       |
+| Authentication (Node) | `src/lib/auth.ts`      | JWT auth (jsonwebtoken/bcryptjs), session management (Node runtime) |
+| Edge Auth        | `src/middleware.ts`         | JWT verify via `jose:jwtVerify` (Edge Runtime, async) |
+| Database         | `src/lib/prisma.ts`         | Prisma client singleton (requires `prisma generate` at build) |
 | Audit Logging    | `src/lib/audit.ts`          | Automatic audit trail for state changes       |
 | Asset Management | `src/app/api/assets/`       | Asset CRUD, assignment, return, accessories   |
 | User Management  | `src/app/api/users/`        | User CRUD, roles, departments, invitations    |
@@ -57,3 +58,5 @@ Two catalogs worth knowing exist (read on demand, not up front):
 ## Active Development Focus
 
 Building the MVP of an Asset Management Platform to replace manual Excel/PDF-based tracking. Core features: asset lifecycle management, accessory tracking with unique IDs, multi-department approval chains (HR, IT, Compliance), comprehensive audit trails, and role-based access control with Superadmin user invitation capabilities.
+
+> **2026-09-16 update:** MVP core complete and Vercel-deployable after build hardening (PR #5): `build` now `prisma generate && next build` + `postinstall` `prisma generate`; Edge middleware migrated to `jose` (async). Open debt: Next.js 14.2.0 CVE upgrade, `exhaustive-deps` lint fixes, eslint/glob upgrades — see `ai-system/system-architecture.md` Discrepancy Report and `ai-system/planning/task-queue.md` Sprint 2.1.

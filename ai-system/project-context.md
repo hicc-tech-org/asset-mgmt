@@ -1,8 +1,8 @@
 # Project Context
 
 > **Metadata**
-> - last-updated-by: bootstrap-project
-> - last-verified-against-code: 2026-08-29
+> - last-updated-by: update-ai-system
+> - last-verified-against-code: 2026-09-16
 > - staleness-policy: re-verify if >10 sessions old or after major scope changes
 
 > **Overview:** Why this project exists, who it serves, and what constraints govern development. Agents should read this to understand the "why" behind the work.
@@ -41,9 +41,9 @@ Asset Management Platform to replace the client's manual Excel/PDF-based asset t
 
 ## Current Project Phase
 
-Phase: Active Development
+Phase: Active Development — MVP core complete; hardening sprints done (2.1 + follow-up)
 
-Active sprint focus: Building MVP with core asset management, approval workflows, audit trails, and user management
+Active sprint focus: MVP core (Phase 1–2) complete and Vercel-deployable; 2026-09-16 hardening fixed Prisma generate + jose Edge; 2026-09-16 follow-up closed all deep-sync discrepancies (Next.js 15.5.25 CVE fix, eslint 9.31 flat config, exhaustive-deps via useCallback, Next 15 async cookies). Next: Phase 3 secondary features (email, import/export, bulk ops).
 
 ---
 
@@ -51,13 +51,15 @@ Active sprint focus: Building MVP with core asset management, approval workflows
 
 | Decision | Reason |
 |----------|--------|
-| Next.js 14 App Router | Modern React framework with server components, API routes, and good DX |
+| Next.js 15.5.25 App Router | Modern React framework with server components, API routes, and good DX (upgraded from 14.2.0 to fix CVE https://nextjs.org/blog/security-update-2025-12-11; Next 15 keeps React 18.2.0 compat) |
 | Prisma ORM | Type-safe database access with excellent TypeScript integration |
 | PostgreSQL | Robust relational database for complex relationships and audit trails |
 | Tailwind CSS | Utility-first styling with design token support |
-| JWT in HttpOnly cookies | Secure authentication without localStorage exposure |
+| JWT in HttpOnly cookies | Secure authentication without localStorage exposure — Node: jsonwebtoken/bcryptjs; Edge: jose (jwtVerify) — Node cookies API is async in Next 15 (`setAuthCookie`/`clearAuthCookie` await `cookies()`) |
 | React Hook Form + Zod | Performant forms with schema validation |
 | Custom UI components | Full control over design system, no external dependencies |
+| Prisma generate at build | Required on Vercel (`build` + `postinstall`) to avoid cached-client `PrismaClientInitializationError` |
+| ESLint 9.31 flat config | `eslint.config.mjs` via FlatCompat (`next/core-web-vitals`), replaces `.eslintrc.js`; fixes glob vuln and exhaustive-deps (useCallback) |
 
 ---
 
