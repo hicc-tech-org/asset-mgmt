@@ -40,7 +40,7 @@ export default function ApprovalsPage() {
   const [selectedApproval, setSelectedApproval] = React.useState<Approval | null>(null)
   const [actionLoading, setActionLoading] = React.useState(false)
   
-  const fetchApprovals = async () => {
+  const fetchApprovals = React.useCallback(async () => {
     setLoading(true)
     try {
       const params = new URLSearchParams({
@@ -58,11 +58,11 @@ export default function ApprovalsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [page, pageSize, filters.status, filters.type])
   
   React.useEffect(() => {
     fetchApprovals()
-  }, [page, filters])
+  }, [fetchApprovals])
   
   const handleAction = async (approvalId: string, action: 'approve' | 'reject', comments?: string) => {
     setActionLoading(true)

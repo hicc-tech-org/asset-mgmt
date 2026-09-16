@@ -114,11 +114,36 @@
 
 **Action Items**:
 - [x] Document Edge/Node split in `index/dependency-graph.md` and `system-architecture.md`
-- [ ] Add CI step: `npm run build` must pass before merge (catches Prisma/Edge issues early)
-- [ ] Upgrade Next.js 14.2.0 to patched version (CVE https://nextjs.org/blog/security-update-2025-12-11)
-- [ ] Upgrade `eslint@8.56.0` and `glob` to remove deprecation/vuln warns
-- [ ] Fix `react-hooks/exhaustive-deps` warnings (wrap fetchers in useCallback)
+- [x] Upgrade Next.js 14.2.0 to patched version (CVE https://nextjs.org/blog/security-update-2025-12-11) — done 2026-09-16 follow-up: `next` 15.5.25 + `eslint-config-next` 15.5.25
+- [x] Upgrade `eslint@8.56.0` and `glob` to remove deprecation/vuln warns — done 2026-09-16 follow-up: `eslint` 9.31.0 flat config (`eslint.config.mjs` via FlatCompat)
+- [x] Fix `react-hooks/exhaustive-deps` warnings (wrap fetchers in useCallback) — done 2026-09-16 follow-up: `React.useCallback` in 4 pages, lint `✔ No warnings`
+- [ ] Add CI step: `npm run build` must pass before merge (catches Prisma/Edge/issues early — now also guards Next 15 async `cookies()` breaking change)
 - [ ] Add `npm audit` to quality gate
+
+---
+
+## 2026-09-16 — Next 15 / ESLint 9 Migration & Exhaustive-Deps (follow-up)
+
+**Lesson**: Major framework bumps (14→15) fix CVEs and deprecations but introduce breaking APIs (`cookies()` async) that must be codemodded together.
+
+**Context**: Follow-up to 2026-09-16 deep sync. Remaining issues: `next@14.2.0` CVE, `eslint@8.56.0` deprecated + `glob@7`/`glob@10` vulns (`@humanwhocodes/*` deprecated), and 4× `react-hooks/exhaustive-deps` warnings. Upgrading `next` to `15.5.25` to allow `eslint@9` (config-next 14 only peers `^8`) exposed Next 15 `cookies()` Promise breaking change.
+
+**What Worked**:
+- Choosing `next@15.5.25` over `14.2.35` patch: CVE fixed and unlocks `eslint@9` flat config without override hacks, while keeping React `18.2.0` (Next 15 supports `^18 || ^19`). Build `prisma generate && next build` passes (`✓ Compiled successfully`, 21 routes, middleware 39 kB).
+- `eslint 9.31.0` + `eslint-config-next 15.5.25` + `eslint.config.mjs` (FlatCompat `next/core-web-vitals`) removes all glob deprecation warnings; `next lint` now `✔ No ESLint warnings or errors` (previously 4 exhaustive-deps warnings). `FlatCompat` avoids full manual flat-config rewrite.
+- `react-hooks/exhaustive-deps`: wrapping `fetch*` in `React.useCallback` with explicit deps and making `useEffect` depend on the callback is the minimal non-looping fix (tested across `approvals/assets/audit-logs/users` pages: `src/app/approvals/page.tsx:43-65`, etc.).
+- `src/lib/auth.ts`: making `setAuthCookie`/`clearAuthCookie` `async` + `await cookies()` and updating `src/app/api/auth/{login,register,logout}/route.ts` to `await` fixes the `Promise<ReadonlyRequestCookies>` type error cleanly without touching `verifyToken`/`hashPassword` (still sync/Node-only).
+
+**What Could Improve**:
+- Should have anticipated Next 15 `cookies()` async codemod when bumping `next` major; `npm run typecheck` caught it (`Property 'set' does not exist on type 'Promise<ReadonlyRequestCookies>'`), but CI would have caught earlier.
+- `next lint` is deprecated in Next 15 — should migrate lint script to `eslint .` via `npx @next/codemod@canary next-lint-to-eslint-cli` in next sprint to future-proof.
+- `prisma@5.10.0`→`8.0.0-rc` major available but not upgraded — evaluate separately (migration + Accelerate considerations).
+
+**Action Items**:
+- [x] Document async `cookies()` pattern in `system-architecture.md` (Auth Node) and `index/repo-map.md`
+- [ ] Migrate `package.json:scripts.lint` from `next lint` to `eslint .` (requires flat config finalize + CI update)
+- [ ] Evaluate Prisma 5→8 major upgrade
+- [ ] Add `npm audit` pre-merge check
 
 ---
 

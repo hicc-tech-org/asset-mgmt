@@ -4,6 +4,7 @@
 > - last-updated-by: update-ai-system
 > - last-verified-against-code: 2026-09-16
 > - staleness-policy: re-verify before trusting if any architecture-affecting commits have been made since last-verified-against-code
+> - notable-update: 2026-09-16 Next.js 15.5.25 + eslint 9.31 flat config + async cookies + exhaustive-deps fix
 
 > **Overview:** How the system is structured — layers, modules, data flow, and configuration. Agents designing or changing structure must read this first.
 
@@ -156,16 +157,17 @@ All config points follow the fallback discipline from `standards/engineering-pri
 
 | Layer | Technology | Version |
 |-------|-----------|---------|
-| Frontend | Next.js / React | 14.2.0 / 18.2.0 |
-| Backend | Next.js API Routes | 14.2.0 |
+| Frontend | Next.js / React | 15.5.25 / 18.2.0 |
+| Backend | Next.js API Routes | 15.5.25 |
 | Database | PostgreSQL | 14+ |
 | ORM | Prisma | 5.10.0 |
 | Auth (Node) | jsonwebtoken (HS256) + bcryptjs | 9.0.2 / 2.4.3 |
 | Auth (Edge) | jose jwtVerify | 5.6.3 |
 | Styling | Tailwind CSS | 3.4 |
 | Validation | Zod | 3.22 |
+| Lint | ESLint (flat config) | 9.31.0 (eslint-config-next 15.5.25, FlatCompat) |
 
-> **Version pin drift:** Next.js 14.2.0 has a security vulnerability per npm warn (`https://nextjs.org/blog/security-update-2025-12-11`). Upgrade to patched version required — see Discrepancy Report below.
+> **Version pin drift resolved 2026-09-16:** Next.js upgraded from 14.2.0 (CVE https://nextjs.org/blog/security-update-2025-12-11) to 15.5.25. ESLint migrated from 8.56 legacy (.eslintrc.js) to 9.31 flat config (eslint.config.mjs). Glob vuln removed via eslint 9 dependency tree.
 
 ---
 
@@ -177,21 +179,24 @@ All config points follow the fallback discipline from `standards/engineering-pri
 - Asset accessory creation during asset creation needs transaction wrapper
 - No file upload for asset images/documents
 - No real-time updates (polling only)
-- Next.js 14.2.0 pinned with known CVE — upgrade pending
+- `next@15.5.25` uses `eslint@9.31.0` via FlatCompat; `next lint` is deprecated in Next 15 (use `eslint .` via `npx @next/codemod next-lint-to-eslint-cli` for future CLI migration)
+- `src/lib/auth.ts` now async cookies API (Next 15 `cookies()` returns Promise) — `setAuthCookie`/`clearAuthCookie` are async and must be awaited in route handlers
 
 ---
 
-## Discrepancy Report (2026-09-16 deep sync)
+## Discrepancy Report (2026-09-16 deep sync — follow-up)
 
 | Area | Finding | Severity | Action |
 |------|---------|----------|--------|
-| Build | `prisma generate` missing from build → Vercel `PrismaClientInitializationError` on `Collecting page data` | High — fixed | Added to `build` + `postinstall` |
-| Edge Runtime | `src/middleware.ts` imported `src/lib/auth.ts` (jsonwebtoken/bcryptjs) → Edge warnings `process.nextTick`/`setImmediate`/`process.version` | High — fixed | Migrated middleware to `jose` (Edge-compatible), made `middleware` async |
-| Security | `next@14.2.0` security vulnerability (npm warn, 2025-12-11 blog) | High — open | Upgrade Next.js to patched version; re-verify `middleware` matcher & `jose` compatibility |
-| Lint | `react-hooks/exhaustive-deps` warnings in `approvals/assets/audit-logs/users` pages (`fetch*` missing dep) | Low — open | Wrap fetchers in `useCallback` or include in deps; or disable with comment + justification |
-| ESLint/Glob deprecations | `@humanwhocodes/*` deprecated, `glob@7`/`glob@10` vuln warnings, `eslint@8.56.0` unsupported | Medium — open | Upgrade to `eslint@9` + `@eslint/*` next, glob v11; requires config migration |
+| Build | `prisma generate` missing from build → Vercel `PrismaClientInitializationError` on `Collecting page data` | High — fixed (2026-09-16) | Added to `build` + `postinstall` |
+| Edge Runtime | `src/middleware.ts` imported `src/lib/auth.ts` (jsonwebtoken/bcryptjs) → Edge warnings `process.nextTick`/`setImmediate`/`process.version` | High — fixed (2026-09-16) | Migrated middleware to `jose` (Edge-compatible), made `middleware` async |
+| Security | `next@14.2.0` security vulnerability (npm warn, 2025-12-11 blog) | High — fixed (2026-09-16) | Upgraded `next` + `eslint-config-next` to `15.5.25`; re-verified `middleware` matcher & `jose` compatibility; `next.config.js` serverActions still valid |
+| Lint | `react-hooks/exhaustive-deps` warnings in `approvals/assets/audit-logs/users` pages (`fetch*` missing dep) | Low — fixed (2026-09-16) | Wrapped fetchers in `React.useCallback` with explicit deps; `useEffect` now depends on `fetch*` callback — lint passes with zero warnings |
+| ESLint/Glob deprecations | `@humanwhocodes/*` deprecated, `glob@7`/`glob@10` vuln warnings, `eslint@8.56.0` unsupported | Medium — fixed (2026-09-16) | Upgraded `eslint` to `9.31.0`, `eslint-config-next` to `15.5.25`; migrated `.eslintrc.js` → `eslint.config.mjs` (FlatCompat, flat config); glob vuln removed (eslint 9 uses `@eslint/config-array` + `@eslint/eslintrc`) |
+| Cookies API | Next 15 `cookies()` async breaking change | Medium — fixed (2026-09-16) | `src/lib/auth.ts:setAuthCookie`/`clearAuthCookie` made `async` + `await cookies()`; call sites (`/api/auth/login`, `/register`, `/logout`) now `await` |
 | Config | `next.config.js` lacks `prisma` generate awareness | Fixed | Documented via `package.json` scripts |
-| Docs | `repo-map.md`/`dependency-graph.md` stale wrt Edge split and build | Fixed | Updated in this sync |
+| Docs | `repo-map.md`/`dependency-graph.md` stale wrt Edge split and build | Fixed | Updated in this sync and follow-up sync |
+| Remaining | `next lint` deprecated in Next 15; `prisma@5.10.0` update available (8.0.0-rc) | Low — open | Migrate lint script to `eslint .` via `npx @next/codemod@canary next-lint-to-eslint-cli` when ready; evaluate Prisma 6/8 major upgrade separately |
 
 ---
 

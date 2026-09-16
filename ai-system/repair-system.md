@@ -68,6 +68,97 @@ Import trace: ./node_modules/jsonwebtoken/... -> ./src/lib/auth.ts
 
 ---
 
+### Next.js 15 — `cookies()` Async Breaking Change
+
+**Error** (typecheck/build):
+```
+Property 'set' does not exist on type 'Promise<ReadonlyRequestCookies>'.
+  export function setAuthCookie(token: string) {
+    cookies().set('auth-token', token, {...})
+               ^^^
+Property 'delete' does not exist on type 'Promise<ReadonlyRequestCookies>'.
+```
+
+**Cause**: Next.js 15 makes `next/headers:cookies()` async (returns `Promise`). Previous `src/lib/auth.ts` called `cookies().set/delete` sync.
+
+**Fix** (applied 2026-09-16 follow-up, Next 15.5.25 migration):
+```ts
+// src/lib/auth.ts
+export async function setAuthCookie(token: string) {
+  const cookieStore = await cookies()
+  cookieStore.set('auth-token', token, { httpOnly: true, ... })
+}
+export async function clearAuthCookie() {
+  const cookieStore = await cookies()
+  cookieStore.delete('auth-token')
+}
+// call sites
+await setAuthCookie(token) // src/app/api/auth/login & register
+await clearAuthCookie()    // src/app/api/auth/logout
+// getSession already await cookies()
+```
+
+**Prevention**: After any `next` major bump, run `npm run typecheck` + `npm run build`; grep `cookies()` and ensure `await`.
+
+---
+
+### ESLint 9 / Glob Deprecations & Flat Config Migration
+
+**Error** (install warnings + `next lint` deprecated):
+```
+npm warn deprecated glob@7.2.3 / glob@10.3.10 — Old versions contain vuln
+npm warn deprecated @humanwhocodes/config-array@0.11.14 / object-schema@2.0.3
+npm warn deprecated eslint@8.56.0 — no longer supported
+`next lint` is deprecated and will be removed in Next.js 16.
+```
+
+**Cause**: `eslint@8.56.0` + `eslint-config-next@14.2.0` tree depends on old `glob` and `@humanwhocodes/*`. Next 14 cannot peer `eslint@9`.
+
+**Fix** (applied 2026-09-16 follow-up):
+- `next` 14.2.0 → 15.5.25, `eslint-config-next` 14.2.0 → 15.5.25 (peers `eslint ^9`), `eslint` 8.56.0 → 9.31.0
+- `.eslintrc.js` → `eslint.config.mjs` (flat config, `FlatCompat` `next/core-web-vitals`, ignores `.next/out/build/next-env.d.ts`)
+- Glob vuln removed via `eslint@9` using `@eslint/config-array` / `@eslint/eslintrc` (no `glob` 7/10 in tree). Verify: `npm install` shows no glob warnings.
+
+**Prevention**: Pin `eslint` major to `next` peer range; migrate to flat config via `npx @next/codemod@canary next-lint-to-eslint-cli` when upgrading Next.
+
+---
+
+### React Hooks — `exhaustive-deps` Missing Dependency
+
+**Error** (lint):
+```
+65:6  Warning: React Hook React.useEffect has a missing dependency: 'fetchApprovals'. Either include it or remove the dependency array. react-hooks/exhaustive-deps
+(src/app/{approvals,assets,audit-logs,users}/page.tsx)
+```
+
+**Cause**: `fetch*` defined inline captures `page`/`filters`/`pageSize` closure. `useEffect` depended on `[page, filters]` but not on the function itself, causing stale closure risk and lint warning.
+
+**Fix** (applied 2026-09-16 follow-up):
+```ts
+const fetchApprovals = React.useCallback(async () => { ... }, [page, pageSize, filters.status, filters.type])
+React.useEffect(() => { fetchApprovals() }, [fetchApprovals])
+// Similarly: fetchAssets [page, pageSize, filters.status, filters.category, filters.search]
+// fetchLogs [page, pageSize, filters.entityType, filters.action, filters.actorId]
+// fetchUsers [page, pageSize, filters.department, filters.role, filters.search]
+```
+
+**Prevention**: All data-fetch callbacks used in `useEffect` must be `useCallback`-wrapped with explicit deps; future lint `✔ No warnings`.
+
+---
+
+### Next.js Security Vulnerability (CVE 2025-12-11)
+
+**Error** (install warn):
+```
+npm warn deprecated next@14.2.0: This version has a security vulnerability. Please upgrade to a patched version. See https://nextjs.org/blog/security-update-2025-12-11
+```
+
+**Fix** (applied 2026-09-16 follow-up): `next` 14.2.0 → 15.5.25 (latest 15 stable, includes patch). Verified `jose` Edge compat, `next.config.js` serverActions, and `await params` remain compatible. Build/lint/typecheck pass.
+
+**Prevention**: Run `npm audit` + check Next.js security blog pre-deploy; keep `next` pinned to latest stable minor within major.
+
+---
+
 ### Database Connection Failed
 
 **Error**: `P1001: Can't reach database server` or `ECONNREFUSED`

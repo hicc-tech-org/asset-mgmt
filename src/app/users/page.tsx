@@ -40,7 +40,7 @@ export default function UsersPage() {
     page: 1,
   })
   
-  const fetchUsers = async () => {
+  const fetchUsers = React.useCallback(async () => {
     setLoading(true)
     try {
       const params = new URLSearchParams({
@@ -59,11 +59,11 @@ export default function UsersPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [page, pageSize, filters.department, filters.role, filters.search])
   
   React.useEffect(() => {
     fetchUsers()
-  }, [page, filters])
+  }, [fetchUsers])
   
   const columns: Column<User>[] = [
     {

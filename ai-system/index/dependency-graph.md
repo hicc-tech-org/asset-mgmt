@@ -42,6 +42,14 @@ src/app (pages & API routes)
 ```
 
 > **Edge/Node split (drift fixed 2026-09-16):** `src/middleware.ts` no longer imports `src/lib/auth.ts`. Previous import caused Edge warnings (`process.nextTick`, `setImmediate`, `process.version`). `src/lib/auth.ts` stays Node-only; middleware uses `jose` independently with shared `JWT_SECRET` env.
+> **Next 15 migration (2026-09-16 follow-up):** `next` 15.5.25 requires async `cookies()` in `src/lib/auth.ts` (`setAuthCookie`/`clearAuthCookie` now `async`); `eslint` 9.31 uses flat config (`eslint.config.mjs` via `FlatCompat`); `react-hooks/exhaustive-deps` fixed via `useCallback`.
+
+### Frontend Hooks
+
+- `approvals/page.tsx:fetchApprovals` — `useCallback` with `[page, pageSize, filters.status, filters.type]` → `useEffect` on `[fetchApprovals]`
+- `assets/page.tsx:fetchAssets` — `useCallback` with `[page, pageSize, filters.status, filters.category, filters.search]`
+- `audit-logs/page.tsx:fetchLogs` — `useCallback` with `[page, pageSize, filters.entityType, filters.action, filters.actorId]`
+- `users/page.tsx:fetchUsers` — `useCallback` with `[page, pageSize, filters.department, filters.role, filters.search]`
 
 ---
 
@@ -50,7 +58,7 @@ src/app (pages & API routes)
 ```
 src/app/api/auth/login/route.ts
     ├──→ src/lib/prisma.ts
-    ├──→ src/lib/auth.ts (verifyPassword, generateToken, setAuthCookie)
+    ├──→ src/lib/auth.ts (verifyPassword, generateToken, setAuthCookie — async in Next 15)
     └──→ @prisma/client (User)
 
 src/app/api/auth/me/route.ts
@@ -239,25 +247,27 @@ AdminPage
 ## External Dependencies
 
 ### Runtime
-- `next` — Framework (14.2.0 pinned; note security advisory — see discrepancy report)
-- `react`, `react-dom` — UI
-- `@prisma/client` — Database client
-- `bcryptjs` — Password hashing (Node-only, not Edge)
-- `jsonwebtoken` — JWT tokens (Node-only, API routes; not Edge)
+- `next` — Framework (15.5.25, upgraded from 14.2.0 CVE fix)
+- `react`, `react-dom` — UI (18.2.0, compatible with Next 15)
+- `@prisma/client` — Database client (5.10.0)
+- `bcryptjs` — Password hashing (Node-only, not Edge, 2.4.3)
+- `jsonwebtoken` — JWT tokens (Node-only, API routes; not Edge, 9.0.2) + `jose` 5.6.3 for Edge
 - `jose` — JWT verification in Edge middleware (5.6.3, added 2026-09-16)
-- `zod` — Validation schemas
-- `date-fns` — Date formatting
+- `zod` — Validation schemas (3.22.4)
+- `date-fns` — Date formatting (3.3.1)
 - `clsx`, `tailwind-merge` — Class composition
-- `lucide-react` — Icons
-- `react-hook-form`, `@hookform/resolvers/zod` — Forms
+- `lucide-react` — Icons (0.344.0)
+- `react-hook-form`, `@hookform/resolvers/zod` — Forms (7.51.0 / 3.3.4)
 
 ### Build
 - `prisma generate` now part of `build` and `postinstall` (Vercel cache fix 2026-09-16; pre-fails with `PrismaClientInitializationError` during `Collecting page data` otherwise)
-- `next build` — Compiled successfully with Edge warnings removed post-jose migration (remaining lint warnings suppressed/flagged)
+- `next build` — Compiled successfully with Edge warnings removed post-jose migration; lint now → `eslint.config.mjs` flat config (no warnings)
+- `next.config.js` — `experimental.serverActions.bodySizeLimit: '2mb'` still valid in Next 15 (experiments warning benign)
 
 ### Development
-- `typescript` — Type checking
-- `tailwindcss`, `postcss`, `autoprefixer` — Styling
-- `eslint`, `eslint-config-next` — Linting
-- `prisma` — ORM CLI
-- `tsx` — TypeScript execution for scripts
+- `typescript` — Type checking (5.3.3)
+- `tailwindcss`, `postcss`, `autoprefixer` — Styling (3.4.1 / 8.4.35 / 10.4.17)
+- `eslint` — Linting (9.31.0 flat config via `eslint.config.mjs` + `FlatCompat`, replaces `.eslintrc.js`)
+- `eslint-config-next` — 15.5.25 (peer `eslint ^7 || ^8 || ^9`)
+- `prisma` — ORM CLI (5.10.0)
+- `tsx` — TypeScript execution for scripts (4.7.0)

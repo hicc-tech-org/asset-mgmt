@@ -55,13 +55,13 @@
 
 ---
 
-## Phase 3.5 — Build & Deploy Hardening (Added 2026-09-16)
+## Phase 3.5 — Build & Deploy Hardening (Added 2026-09-16, completed follow-up 2026-09-16)
 
 - [x] Fix Vercel build: add `prisma generate` to `build` + `postinstall` (PrismaClientInitializationError)
 - [x] Fix Edge Runtime: migrate `src/middleware.ts` to `jose:jwtVerify` (remove bcryptjs/jsonwebtoken Node APIs from Edge)
-- [ ] Upgrade Next.js 14.2.0 to patched version (security vulnerability https://nextjs.org/blog/security-update-2025-12-11)
-- [ ] Fix ESLint warnings: `react-hooks/exhaustive-deps` in approvals/assets/audit-logs/users pages
-- [ ] Upgrade ESLint 8.56 + glob deprecations
+- [x] Upgrade Next.js 14.2.0 → 15.5.25 (CVE https://nextjs.org/blog/security-update-2025-12-11; also handles Next 15 async cookies API)
+- [x] Fix ESLint warnings: `react-hooks/exhaustive-deps` in approvals/assets/audit-logs/users pages (useCallback pattern)
+- [x] Upgrade ESLint 8.56 + glob deprecations → eslint 9.31 flat config (eslint.config.mjs, FlatCompat, glob vuln removed)
 
 ---
 
@@ -102,3 +102,4 @@
 - [x] UI component library
 - [x] Vercel deploy fix (Prisma generate) — 2026-09-16
 - [x] Edge middleware fix (jose) — 2026-09-16
+- [x] Next.js CVE + ESLint/glob upgrade + exhaustive-deps fix + async cookies migration — 2026-09-16 (15.5.25 / 9.31)

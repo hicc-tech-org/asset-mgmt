@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
       lastName: user.lastName,
     })
     
-    setAuthCookie(token)
+    await setAuthCookie(token)
     
     return NextResponse.json({
       user: {
