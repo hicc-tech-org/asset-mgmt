@@ -83,9 +83,9 @@
 |----|------|--------|----------|-------|
 | T048 | Fix Vercel Prisma build (prisma generate) | ✅ Done | fix-build | `build`: `prisma generate && next build`, `postinstall`: `prisma generate`; fixes `PrismaClientInitializationError` |
 | T049 | Fix Edge Runtime auth (jose) | ✅ Done | fix-build | Migrated `src/middleware.ts` to `jose:jwtVerify` (async), decouples Edge from bcryptjs/jsonwebtoken |
-| T050 | Upgrade Next.js 14.2.0 (CVE) | ⏳ Pending | — | Security update https://nextjs.org/blog/security-update-2025-12-11 |
-| T051 | Fix ESLint exhaustive-deps warnings | ⏳ Pending | — | approvals/assets/audit-logs/users `fetch*` missing dep |
-| T052 | Upgrade ESLint/glob deprecations | ⏳ Pending | — | eslint 8.56 deprecated, glob 7/10 vuln |
+| T050 | Upgrade Next.js 14.2.0 (CVE) | ✅ Done | update-ai-system | Upgraded `next` + `eslint-config-next` to `15.5.25` (CVE https://nextjs.org/blog/security-update-2025-12-11); handled async cookies API |
+| T051 | Fix ESLint exhaustive-deps warnings | ✅ Done | update-ai-system | Wrapped fetchers in `React.useCallback`; `useEffect` now depends on callback — lint `✔ No warnings` |
+| T052 | Upgrade ESLint/glob deprecations | ✅ Done | update-ai-system | `eslint` `8.56.0` → `9.31.0`, `.eslintrc.js` → `eslint.config.mjs` (FlatCompat flat config); glob vuln removed |
 
 ---
 

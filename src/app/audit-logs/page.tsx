@@ -35,7 +35,7 @@ export default function AuditLogsPage() {
     page: 1,
   })
   
-  const fetchLogs = async () => {
+  const fetchLogs = React.useCallback(async () => {
     setLoading(true)
     try {
       const params = new URLSearchParams({
@@ -54,11 +54,11 @@ export default function AuditLogsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [page, pageSize, filters.entityType, filters.action, filters.actorId])
   
   React.useEffect(() => {
     fetchLogs()
-  }, [page, filters])
+  }, [fetchLogs])
   
   const columns: Column<AuditLog>[] = [
     {

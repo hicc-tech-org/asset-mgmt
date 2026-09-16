@@ -40,7 +40,7 @@ export default function AssetsPage() {
     page: 1,
   })
   
-  const fetchAssets = async () => {
+  const fetchAssets = React.useCallback(async () => {
     setLoading(true)
     try {
       const params = new URLSearchParams({
@@ -59,11 +59,11 @@ export default function AssetsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [page, pageSize, filters.status, filters.category, filters.search])
   
   React.useEffect(() => {
     fetchAssets()
-  }, [page, filters])
+  }, [fetchAssets])
   
   const columns: Column<Asset>[] = [
     { key: 'assetId', header: 'Asset ID' },

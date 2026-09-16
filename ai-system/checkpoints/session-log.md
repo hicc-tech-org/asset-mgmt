@@ -82,3 +82,25 @@
 **Files Updated**: 9 ai-system docs + metadata headers
 
 **Next Session**: Upgrade Next.js to patched version; fix lint warnings; proceed with Phase 3 secondary features
+
+---
+
+## 2026-09-16 — Next.js 15 / ESLint 9 Upgrade & Exhaustive-Deps Fix (update-ai-system follow-up)
+
+**Agent**: update-ai-system / fix-build discrepancies closure
+
+**Duration**: Single session (deep sync follow-up)
+
+**Summary**: Closed all discrepancies flagged in prior deep sync: Next.js CVE (14.2.0 → 15.5.25), eslint/glob deprecations (8.56 → 9.31 flat config), exhaustive-deps warnings (useCallback), and Next 15 async cookies breaking change.
+
+**Actions**:
+1. Upgraded `next` 14.2.0 → 15.5.25 + `eslint-config-next` 14.2.0 → 15.5.25 (CVE https://nextjs.org/blog/security-update-2025-12-11) — install shows no glob warnings
+2. Migrated ESLint legacy `.eslintrc.js` → `eslint.config.mjs` (flat config, FlatCompat `next/core-web-vitals`, ignores `.next/out/build/next-env.d.ts`) — `eslint` 8.56 → 9.31; glob vuln (`glob@7`/`glob@10`, `@humanwhocodes/*`) removed via eslint 9 tree
+3. Fixed `react-hooks/exhaustive-deps` in 4 pages (`src/app/approvals/page.tsx:43-65`, `src/app/assets/page.tsx:43-66`, `src/app/audit-logs/page.tsx:38-61`, `src/app/users/page.tsx:43-66`) — wrapped `fetch*` in `React.useCallback` with explicit deps, `useEffect` now on `[fetch*]` → lint `✔ No ESLint warnings or errors`
+4. Handled Next 15 breaking `cookies()` async: `src/lib/auth.ts:setAuthCookie`/`clearAuthCookie` → `async` + `await cookies()`, call sites `src/app/api/auth/{login,register,logout}/route.ts` now `await` — fixed `Property 'set' does not exist on type 'Promise<ReadonlyRequestCookies>'`
+5. Verified: `npm run typecheck` pass, `npm run lint` pass, `npm run build` (`prisma generate && next build`) → `✓ Compiled successfully`, 21 routes, middleware 39 kB, no Edge warnings
+6. Deep-synced docs: `system-architecture.md` (Tech Stack 15.5.25, discrepancy report closed), `index/repo-map.md` (eslint.config.mjs, async auth), `index/dependency-graph.md` (runtime/build/dev versions, hook deps), `planning/project-plan.md` + `task-queue.md` (T050-T052 ✅), `summaries/dev-history.md` (new 2026-09-16 follow-up entry), `memory/architecture-history.md` (new 2026-09-16 entry), `memory/lessons-learned.md` (new lesson + action items closed), `repair-system.md` (new patterns: Next 15 cookies, eslint 9 flat config, exhaustive-deps, CVE), `project-context.md`, `checkpoints/session-log.md`
+
+**Files Updated**: 11 ai-system docs + `package.json`, `package-lock.json`, `eslint.config.mjs` (new), `.eslintrc.js` (removed), `src/lib/auth.ts`, `src/app/api/auth/*`, 4 pages
+
+**Next Session**: Phase 3 secondary features (email, import/export, bulk ops); CI `npm run build` + `npm audit` gates

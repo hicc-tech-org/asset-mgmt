@@ -77,13 +77,35 @@ Fixed Vercel production build that failed during `Collecting page data` with `Pr
 - Edge/Node runtime boundary explicitly separated: middleware (Edge+jose) vs API routes (Node+jsonwebtoken/bcryptjs)
 - Docs synchronized: `index/repo-map.md` and `index/dependency-graph.md` updated to reflect Edge split; `system-architecture.md` tech stack and verification CLI updated; `planning/project-plan.md` + `task-queue.md` record hardening sprint
 
-**Known Issues Remaining:**
-- Next.js 14.2.0 security vulnerability (https://nextjs.org/blog/security-update-2025-12-11) — upgrade pending
-- ESLint `react-hooks/exhaustive-deps` warnings in 4 pages
-- Deprecated `eslint@8.56.0`, `glob` vuln warnings
+**Known Issues Remaining:** (resolved in follow-up 2026-09-16)
+- Next.js 14.2.0 security vulnerability — resolved via 15.5.25 upgrade
+- ESLint `react-hooks/exhaustive-deps` warnings — resolved via useCallback
+- Deprecated `eslint@8.56.0`, `glob` vuln warnings — resolved via eslint 9.31 flat config
 
 **Next Sprint Focus:**
-Upgrade Next.js to patched version; fix exhaustive-deps warnings; upgrade ESLint/glob; proceed with Phase 3 secondary features (email, import/export, bulk ops)
+Proceed with Phase 3 secondary features (email, import/export, bulk ops)
+
+---
+
+## 2026-09-16 — Next.js 15 / ESLint 9 Upgrade & Exhaustive-Deps Fix (follow-up)
+
+**Summary:**
+Completed remaining discrepancies flagged in the 2026-09-16 deep sync: upgraded Next.js CVE, fixed `react-hooks/exhaustive-deps`, and migrated ESLint/glob to remove deprecation vulns. Also handled Next 15 breaking change (`cookies()` async).
+
+**Completed:**
+- Next.js 14.2.0 → 15.5.25 (`next` + `eslint-config-next` 15.5.25, CVE https://nextjs.org/blog/security-update-2025-12-11); verified Edge middleware (`jose`) and `next.config.js` compatibility
+- ESLint 8.56.0 → 9.31.0; migrated `.eslintrc.js` → `eslint.config.mjs` (flat config via `FlatCompat`, `next/core-web-vitals`); glob `@humanwhocodes/*` + `glob@7`/`glob@10` vulns removed via eslint 9 tree; `next lint` deprecated warning noted (future: `npx @next/codemod next-lint-to-eslint-cli`)
+- Fixed `react-hooks/exhaustive-deps` in 4 pages: `src/app/approvals/page.tsx:65`, `src/app/assets/page.tsx:66`, `src/app/audit-logs/page.tsx:61`, `src/app/users/page.tsx:66` — wrapped `fetch*` in `React.useCallback` with explicit deps, `useEffect` now on `[fetch*]`; lint: `✔ No ESLint warnings or errors`
+- Next 15 async cookies: `src/lib/auth.ts:setAuthCookie`/`clearAuthCookie` made `async` + `await cookies()`, call sites `src/app/api/auth/login`, `register`, `logout` now `await` — fixes type error `Property 'set' does not exist on type 'Promise<ReadonlyRequestCookies>'`
+- Build verified: `npm run typecheck` pass, `npm run lint` pass, `npm run build` (`prisma generate && next build`) → `✓ Compiled successfully`, 21 pages, `ƒ Middleware 39 kB`, no Edge warnings
+- Docs deep-synced: `system-architecture.md` (Tech Stack 15.5.25, discrepancy report, debt), `index/repo-map.md` (eslint.config.mjs, async auth note), `index/dependency-graph.md` (runtime/build/dev versions, hook deps), `planning/project-plan.md` + `task-queue.md` (T050-T052 ✅), `memory/architecture-history.md`, `memory/lessons-learned.md`, `repair-system.md` updated
+
+**Key Changes:**
+- Framework major minor bump 14→15 (React 18.2.0 retained, compatible); lint major bump 8→9 flat config; auth cookie API breaking change handled
+- Discrepancy report fully closed except low-priority follow-ups (`next lint` CLI migration, Prisma 5→8 major)
+
+**Next Sprint Focus:**
+Phase 3 secondary features; add CI `npm run build` gate + `npm audit` check per lessons-learned action items
 
 ---
 
