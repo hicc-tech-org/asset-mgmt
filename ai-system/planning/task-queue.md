@@ -2,7 +2,7 @@
 
 > **Metadata**
 > - last-updated-by: update-ai-system
-> - last-verified-against-code: 2026-09-16
+> - last-verified-against-code: 2026-09-23
 > - staleness-policy: update after each sprint or when priorities shift
 
 > **Overview:** Granular, sprint-level tasks derived from `project-plan.md`. Tasks are ordered by priority and dependency.
@@ -51,9 +51,9 @@
 
 | ID | Task | Status | Assignee | Notes |
 |----|------|--------|----------|-------|
-| T025 | Email notification service integration | ⏳ Pending | — | SendGrid/SMTP for approval reminders |
-| T026 | Asset import from Excel/CSV | ⏳ Pending | — | Parse uploaded files, validate, create assets |
-| T027 | Asset export to Excel/PDF | ⏳ Pending | — | Generate reports with filters |
+| T025 | Email notification service integration | ⏳ Pending | — | SendGrid/SMTP for approval reminders (`email_notifications_enabled` flag wired) |
+| T026 | Asset import from Excel/CSV | ✅ Done (2026-09-23) | — | `admin/import` (CSV/JSON client parse) → POST `/api/admin/import` bulk create, per-row results, audit-logged |
+| T027 | Asset export to Excel/PDF | ✅ Partial (2026-09-23) | — | `admin/backup` (JSON export via GET `/api/admin/backup`) done; Excel/PDF TODO |
 | T028 | Bulk asset operations (assign, return, retire) | ⏳ Pending | — | Checkbox selection, bulk actions |
 | T029 | Asset transfer workflow | ⏳ Pending | — | Transfer between employees with approval |
 | T030 | Asset maintenance scheduling | ⏳ Pending | — | Schedule, track, notify |
@@ -73,7 +73,7 @@
 | T037 | E2E tests with Playwright | ⏳ Pending | — | Login, dashboard, asset CRUD |
 | T038 | Accessibility audit | ⏳ Pending | — | axe-core, manual testing |
 | T039 | Performance audit | ⏳ Pending | — | Lighthouse, bundle analysis |
-| T040 | Error boundary and loading states | ⏳ Pending | — | Skeleton loaders, error UI |
+| T040 | Error boundary and loading states | ✅ Done (2026-09-23) | — | `skeleton.tsx` added; all list/detail/dashboard gated behind loading skeletons; clarified empty messages |
 
 ---
 
@@ -86,6 +86,17 @@
 | T050 | Upgrade Next.js 14.2.0 (CVE) | ✅ Done | update-ai-system | Upgraded `next` + `eslint-config-next` to `15.5.25` (CVE https://nextjs.org/blog/security-update-2025-12-11); handled async cookies API |
 | T051 | Fix ESLint exhaustive-deps warnings | ✅ Done | update-ai-system | Wrapped fetchers in `React.useCallback`; `useEffect` now depends on callback — lint `✔ No warnings` |
 | T052 | Upgrade ESLint/glob deprecations | ✅ Done | update-ai-system | `eslint` `8.56.0` → `9.31.0`, `.eslintrc.js` → `eslint.config.mjs` (FlatCompat flat config); glob vuln removed |
+
+## Sprint 2.2 — UX & Routing Remediation (Completed 2026-09-23)
+
+| ID | Task | Status | Assignee | Notes |
+|----|------|--------|----------|-------|
+| T053 | Fix 404s (assets/new, assets/[id]/edit\|assign\|return, users/new\|[id], admin/*, auth/logout) | ✅ Done | execute-feature | Created 11 pages + 6 APIs (`dashboard/stats`, `accessories`, `admin/*`, `auth/logout GET`); 32 routes, no 404s |
+| T054 | Layout: collapsible sidebar + mobile hamburger, remove navbar redundancy, signout | ✅ Done | execute-feature | Sidebar collapsible (localStorage) + drawer+overlay; Header hamburger; DashboardLayout owns state; nav single source |
+| T055 | Loading skeletons across all data pages | ✅ Done | execute-feature | `skeleton.tsx` (Skeleton/TableSkeleton/StatsSkeleton); gated DataTables behind loading; clarified empties |
+| T056 | Dashboard real stats (replace mocks) | ✅ Done | execute-feature | `GET /api/dashboard/stats` (counts, recent 5, pending 5, byCategory groupBy); `formatNumber`; skeletons |
+| T057 | Admin editable (accessories CRUD, settings) + import/backup flows | ✅ Done | execute-feature | PATCH/DELETE `/api/accessories/[id]`, PATCH `/api/admin/configs`, import CSV/JSON bulk, backup JSON download; invite/edit user flows |
+| T058 | Verify non-breaking build | ✅ Done | execute-feature | `prisma generate && next build` → 32 routes `✓ Compiled successfully`, middleware 39kB, zero warnings |
 
 ---
 

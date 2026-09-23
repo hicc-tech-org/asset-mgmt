@@ -2,7 +2,7 @@
 
 > **Metadata**
 > - last-updated-by: update-ai-system
-> - last-verified-against-code: 2026-09-16
+> - last-verified-against-code: 2026-09-23
 > - staleness-policy: append-only, never remove entries
 
 > **Overview:** Captured insights from development to avoid repeating mistakes and reinforce good practices.
@@ -162,6 +162,27 @@
 **Action Items**:
 - [ ] Fail fast in production if `JWT_SECRET` is default/fallback (throw or warn prominently)
 - [ ] Document required env vars in README and `.env.example` with `min 32 chars` note already present
+
+---
+
+## 2026-09-23 — Missing Routes & Layout Redundancy
+
+**Lesson**: Scaffold every linked page before shipping nav; gate empty states behind loading skeletons; keep nav in one place.
+
+**Context**: User reported 11+ `404 (_rsc)` for every `Link href` (`assets/new`, `assets/[id]/edit|assign|return`, `users/new|/[id]`, `admin/*`, `auth/logout`, `api/assets/new`) plus `Failed to fetch assets: TypeError`, redundant Header navbar alongside Sidebar, hamburger button no-op, dashboard mock numbers, and admin tabs read-only. Root cause: pages linked in UI but files not created; Header duplicated Sidebar nav; mobile state never wired; DataTable rendered empty immediately without `loading` gate.
+
+**What Worked**:
+- Creating all missing pages + APIs in one additive pass (no breaking changes) closed all 404s and grew `next build` 21→32 routes with `✓ Compiled successfully`. Client-side CSV/JSON import parse avoids extra deps; `skeleton.tsx` (`Skeleton`, `TableSkeleton`, `StatsSkeleton`) is reusable across 6 pages; Sidebar `localStorage` persistence for `collapsed` is zero-backend.
+- Lifting `collapsed`/`mobileOpen` into `DashboardLayout` and passing as props keeps `Sidebar`/`Header` stateless and testable. Real dashboard `GET /api/dashboard/stats` (`count` + `groupBy`) replaces mocks with formatted `formatNumber` and `byCategory` chip row.
+
+**What Could Improve**:
+- Should have run `npm run build` + manual click-through of every Sidebar link before first deploy — would have caught 404s immediately. `knip` or `eslint` rule for dead `href`s would help.
+- Should have enforced “nav belongs to Sidebar only” from day one; Header duplicated nav introduced redundancy that confused mobile IA.
+
+**Action Items**:
+- [ ] Add CI `npm run build` gate + smoke test that visits every `navigation` href (200 check)
+- [ ] Add lint rule: `Header` must not contain `href` list duplicated from `Sidebar`
+- [ ] Evaluate `prisma.$transaction` for bulk import atomicity (currently per-row best-effort with `results` array)
 
 ---
 

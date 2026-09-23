@@ -10,6 +10,7 @@ import { Select } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
 import { formatDate, getRoleLabel, getDepartmentLabel } from '@/lib/utils'
+import { TableSkeleton } from '@/components/ui/skeleton'
 
 interface User {
   id: string
@@ -178,18 +179,22 @@ export default function UsersPage() {
         {/* Users Table */}
         <Card>
           <CardContent className="p-0">
-            <DataTable
-              columns={columns}
-              data={users}
-              keyAccessor={(row) => row.id}
-              emptyMessage="No users found"
-              pagination={{
-                page,
-                pageSize,
-                total,
-                onPageChange: setPage,
-              }}
-            />
+            {loading ? (
+              <TableSkeleton rows={5} cols={6} />
+            ) : (
+              <DataTable
+                columns={columns}
+                data={users}
+                keyAccessor={(row) => row.id}
+                emptyMessage="No users found"
+                pagination={{
+                  page,
+                  pageSize,
+                  total,
+                  onPageChange: setPage,
+                }}
+              />
+            )}
           </CardContent>
         </Card>
       </div>
