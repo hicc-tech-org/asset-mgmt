@@ -10,6 +10,7 @@ import { Select } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { getApprovalStatusLabel } from '@/lib/utils'
 import { formatDate } from '@/lib/utils'
+import { TableSkeleton } from '@/components/ui/skeleton'
 
 interface Approval {
   id: string
@@ -211,18 +212,22 @@ export default function ApprovalsPage() {
         {/* Approvals Table */}
         <Card>
           <CardContent className="p-0">
-            <DataTable
-              columns={columns}
-              data={approvals}
-              keyAccessor={(row) => row.id}
-              emptyMessage="No approval requests found"
-              pagination={{
-                page,
-                pageSize,
-                total,
-                onPageChange: setPage,
-              }}
-            />
+            {loading ? (
+              <TableSkeleton rows={5} cols={6} />
+            ) : (
+              <DataTable
+                columns={columns}
+                data={approvals}
+                keyAccessor={(row) => row.id}
+                emptyMessage="No approval requests found"
+                pagination={{
+                  page,
+                  pageSize,
+                  total,
+                  onPageChange: setPage,
+                }}
+              />
+            )}
           </CardContent>
         </Card>
         

@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { formatDate, formatDateTime, getAssetStatusLabel } from '@/lib/utils'
+import { Skeleton } from '@/components/ui/skeleton'
 
 interface Asset {
   id: string
@@ -49,7 +50,7 @@ export default function AssetDetailPage() {
       .catch(() => setLoading(false))
   }, [params.id])
   
-  if (loading) return <DashboardLayout><div className="p-8 text-center">Loading...</div></DashboardLayout>
+  if (loading) return <DashboardLayout><div className="p-8 space-y-4"><Skeleton className="h-8 w-48" /><Skeleton className="h-64" /><Skeleton className="h-32" /></div></DashboardLayout>
   if (!asset) return <DashboardLayout><div className="p-8 text-center">Asset not found</div></DashboardLayout>
   
   return (
