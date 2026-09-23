@@ -157,6 +157,9 @@ src/
 │   │   │   └── [id]/route.ts         # PATCH, DELETE (AccessoryType)
 │   │   └── admin/
 │   │       ├── configs/route.ts      # GET all, PATCH upsert (SystemConfig)
+│   │       ├── departments/route.ts  # GET aggregated (enum+config), POST/PATCH/DELETE via SystemConfig category=department (non-breaking)
+│   │       ├── roles/route.ts        # GET aggregated (enum+config), POST/PATCH/DELETE via SystemConfig category=role (enum override, non-breaking)
+│   │       ├── preview/route.ts      # POST/DELETE/GET preview-role cookie (SUPERADMIN only, Edge middleware respects)
 │   │       ├── import/route.ts       # POST bulk import assets (JSON/CSV parsed client-side)
 │   │       └── backup/route.ts       # GET export all data (assets/users/approvals/logs)
 │   ├── auth/
@@ -165,23 +168,23 @@ src/
 │   ├── dashboard/
 │   │   └── page.tsx                  # Main dashboard (real stats via /api/dashboard/stats, skeletons, byCategory)
 │   ├── assets/
-│   │   ├── page.tsx                  # Asset list (TableSkeleton, filters, pagination)
+│   │   ├── page.tsx                  # Asset list (TableSkeleton, filters, pagination, URL-synced via useSearchParams + Suspense; handles ?status & ?category & ?search & ?department)
 │   │   ├── new/page.tsx              # Create asset (form → POST /api/assets)
 │   │   ├── [id]/
 │   │   │   ├── page.tsx              # Asset detail (skeleton, auditLogs, accessories)
-│   │   │   ├── edit/page.tsx         # Edit asset (PATCH /api/assets/[id])
+│   │   │   ├── edit/page.tsx         # Edit asset (PATCH /api/assets/[id] + assignment edit via Select for assignee/return date; audit TRANSFER/UNASSIGN)
 │   │   │   ├── assign/page.tsx       # Assign asset (POST /api/assets/assign)
 │   │   │   └── return/page.tsx       # Return asset (POST /api/assets/return)
 │   ├── users/
-│   │   ├── page.tsx                  # User list (TableSkeleton, filters, pagination)
+│   │   ├── page.tsx                  # User list (TableSkeleton, filters, pagination, URL-synced ?department & ?role & ?search via Suspense)
 │   │   ├── new/page.tsx              # Invite user (POST /api/users)
 │   │   └── [id]/page.tsx             # User detail + inline edit (PATCH/DELETE /api/users/[id])
 │   ├── approvals/
-│   │   └── page.tsx                  # Approvals list (TableSkeleton, approve/reject modal)
+│   │   └── page.tsx                  # Approvals list (TableSkeleton, approve/reject modal, URL-synced ?status & ?type)
 │   ├── audit-logs/
-│   │   └── page.tsx                  # Audit logs list (TableSkeleton, filters)
+│   │   └── page.tsx                  # Audit logs list (TableSkeleton, filters, URL-synced ?entityType & ?action & ?actorId)
 │   ├── admin/
-│   │   ├── page.tsx                  # Admin panel (editable: AccessoryTypes CRUD + SystemConfig settings via APIs)
+│   │   ├── page.tsx                  # Admin panel (editable: AccessoryTypes CRUD + SystemConfig settings + Departments CRUD + Roles CRUD + Preview As; all via APIs, audit-logged)
 │   │   ├── import/page.tsx           # Bulk import (CSV/JSON → POST /api/admin/import)
 │   │   ├── backup/page.tsx           # Backup (GET /api/admin/backup → download JSON)
 │   │   └── accessories/
@@ -203,15 +206,15 @@ src/
 │   ├── forms/                        # Form components (future)
 │   ├── tables/                       # Table components (future)
 │   └── layout/                       # Layout components
-│       ├── sidebar.tsx               # Collapsible (w-64↔w-16), mobile drawer + overlay, signout, localStorage persistence
+│       ├── sidebar.tsx               # Collapsible (w-64↔w-16), mobile drawer + overlay, signout, preview banner (filters nav by preview-role), localStorage persistence
 │       ├── header.tsx                # Minimal top bar (hamburger toggle, user chip, signout) — nav removed (sidebar owns nav)
 │       └── dashboard-layout.tsx      # Orchestrates collapsed/mobile state, lg:pl-64/16, passes props to Sidebar/Header
 ├── lib/                              # Core utilities
 │   ├── prisma.ts                     # Prisma client singleton (globalThis guard)
 │   ├── auth.ts                       # Auth utilities (bcryptjs + jsonwebtoken, Node runtime; Next 15: async cookies() — setAuthCookie/clearAuthCookie are async)
-│   ├── audit.ts                      # Audit logging
+│   ├── audit.ts                      # Audit logging (TRANSFER/UNASSIGN for reassignments, Department/Role CREATE/UPDATE/DELETE)
 │   └── utils.ts                      # Common utilities
-├── middleware.ts                     # Edge middleware — MUST use jose (Edge-compatible), not jsonwebtoken/bcryptjs
+├── middleware.ts                     # Edge middleware — MUST use jose (Edge-compatible), not jsonwebtoken/bcryptjs; respects preview-role cookie for SUPERADMIN
 ├── types/                            # TypeScript types (future)
 └── hooks/                            # React hooks (future)
 ```
@@ -249,7 +252,14 @@ src/
 - Exhaustive-deps: Wrapped `fetchApprovals`/`fetchAssets`/`fetchLogs`/`fetchUsers` in `React.useCallback` with explicit deps; `useEffect` now depends on callback — `✔ No ESLint warnings or errors`.
 - Next 15 async cookies: `src/lib/auth.ts:setAuthCookie`/`clearAuthCookie` made `async` + `await cookies()`; call sites (`/api/auth/login`, `/register`, `/logout`) now `await` — fixes `Property 'set' does not exist on type 'Promise<ReadonlyRequestCookies>'` type error introduced by Next 15.
 
-## Drift Fixed 2026-09-23 — Full UX/Routing Remediation
+## Drift Fixed 2026-09-23 — Query Sync, Assignment Edit, Departments/Roles CRUD, Preview (current session)
+
+- Query params: `assets`, `users`, `approvals`, `audit-logs` pages now read `useSearchParams` and sync filters to URL via `router.replace` + `Suspense` fallback; links like `/users?department=HR`, `/assets?status=ASSIGNED` correctly filter. Debounced search (400ms) updates `?search`. Pagination syncs `?page`.
+- Assignment edit: `assets/[id]/edit` now includes “Assignment (admin)” section with `Select` for assignee (users fetched from `/api/users?pageSize=100`) and `expectedReturnDate` input; submit triggers `POST /api/assets/assign` for reassign (creates `AssetTransfer` + `AuditAction.TRANSFER`) or `PATCH` unassign (`UNASSIGN`), then patches remaining fields. `POST /api/assets/assign` now supports reassignment (creates `AssetTransfer`, audit `TRANSFER` vs `ASSIGN`), `PATCH /api/assets/[id]` detects assignment change and logs `TRANSFER`/`UNASSIGN`/`ASSIGN` vs generic `UPDATE`.
+- Departments/Roles CRUD (non-breaking): New APIs `/api/admin/departments` and `/api/admin/roles` store definitions in `SystemConfig` (`category=department|role`, `key=dept_*|role_*`), merging enum fallback + config; enum codes cannot be deleted, edits create override configs. `admin/page.tsx` Departments tab now full CRUD table (code/name/description/isActive/source, edit/delete, view users link) and add/edit form; Roles tab full CRUD (code/label/department/approvals/assets/users, edit/delete, add form). All audit-logged.
+- Preview as: `GET|POST|DELETE /api/admin/preview` sets/clears `preview-role` cookie (SUPERADMIN only). `src/middleware.ts` overrides `x-user-role` with `preview-role` when `payload.role===SUPERADMIN`. `Sidebar` filters `baseNavigation` by `previewRole` cookie, shows purple preview banner with Exit; `admin/page.tsx` Preview tab provides selector + exit per lessons-learned.
+
+## Drift Fixed 2026-09-23 — Full UX/Routing Remediation (earlier 2026-09-23)
 
 - 404s: Created missing pages that caused `Failed to load resource: 404` for RSC fetches: `assets/new`, `assets/[id]/edit|assign|return`, `users/new`, `users/[id]`, `admin/backup|import|accessories/new`, `auth/logout` (POST+GET `/api/auth/logout` + `/auth/logout` page). Added API aliases: `dashboard/stats`, `accessories`(+[id]), `admin/configs|import|backup`. Verified `next build` 32 routes (previously 21) — all 404s resolved.
 - Layout: Removed navbar duplication (Header nav list removed — Sidebar owns nav). Sidebar now collapsible (w-64↔w-16, localStorage `sidebar-collapsed`), mobile drawer with overlay + hamburger in Header toggles `mobileOpen`, close-on-route-change. Signout button in Sidebar (and Header fallback) — POST `/api/auth/logout` then `router.push('/auth/login')`.

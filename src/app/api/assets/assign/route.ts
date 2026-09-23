@@ -31,9 +31,8 @@ export async function POST(request: NextRequest) {
     
     if (!asset) return NextResponse.json({ error: 'Asset not found' }, { status: 404 })
     
-    if (asset.status === 'ASSIGNED' && asset.assignedToId !== assigneeId) {
-      return NextResponse.json({ error: 'Asset already assigned to another user' }, { status: 400 })
-    }
+    const isReassignment = asset.status === 'ASSIGNED' && asset.assignedToId && asset.assignedToId !== assigneeId
+    const previousAssigneeId = asset.assignedToId
     
     const assignee = await prisma.user.findUnique({ where: { id: assigneeId } })
     if (!assignee) return NextResponse.json({ error: 'Assignee not found' }, { status: 404 })
@@ -43,7 +42,7 @@ export async function POST(request: NextRequest) {
       where: { parentAssetId: assetId },
     })
     
-    // Create assignment
+    // Create assignment (or reassignment/transfer)
     const updatedAsset = await prisma.asset.update({
       where: { id: assetId },
       data: {
@@ -55,6 +54,19 @@ export async function POST(request: NextRequest) {
       },
       include: { assignedTo: true },
     })
+
+    if (isReassignment) {
+      await prisma.assetTransfer.create({
+        data: {
+          assetId,
+          fromUserId: previousAssigneeId,
+          toUserId: assigneeId,
+          reason: notes || 'Reassigned via admin',
+          approvedById: user.id,
+          approvedAt: new Date(),
+        },
+      })
+    }
     
     // Assign accessories from request or auto-assign all
     if (accessoryIds && accessoryIds.length > 0) {
@@ -84,12 +96,15 @@ export async function POST(request: NextRequest) {
     // Create audit log
     await createAuditLog({
       actorId: user.id,
-      action: AuditAction.ASSIGN,
+      action: isReassignment ? AuditAction.TRANSFER : AuditAction.ASSIGN,
       entityType: 'Asset',
       entityId: assetId,
       beforeState: { status: asset.status, assignedToId: asset.assignedToId },
       afterState: { status: 'ASSIGNED', assignedToId: assigneeId },
-      description: `Assigned asset ${asset.assetId} to ${assignee.firstName} ${assignee.lastName}`,
+      description: isReassignment
+        ? `Transferred asset ${asset.assetId} from ${asset.assignedTo?.firstName || previousAssigneeId} to ${assignee.firstName} ${assignee.lastName}`
+        : `Assigned asset ${asset.assetId} to ${assignee.firstName} ${assignee.lastName}`,
+      metadata: { previousAssigneeId, notes } as Record<string, unknown>,
     })
     
     return NextResponse.json({ asset: updatedAsset })

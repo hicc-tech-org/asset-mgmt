@@ -5,13 +5,13 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 
-const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: 'layout-dashboard' },
-  { name: 'Assets', href: '/assets', icon: 'monitor' },
-  { name: 'Users', href: '/users', icon: 'users' },
-  { name: 'Approvals', href: '/approvals', icon: 'clipboard-check' },
-  { name: 'Audit Logs', href: '/audit-logs', icon: 'file-text' },
-  { name: 'Admin', href: '/admin', icon: 'settings' },
+const baseNavigation = [
+  { name: 'Dashboard', href: '/dashboard', icon: 'layout-dashboard', roles: ['SUPERADMIN','ADMIN','HR_HEAD','HR_OFFICER','IT_HEAD','IT_OFFICER','COMPLIANCE_HEAD','COMPLIANCE_OFFICER','EMPLOYEE'] },
+  { name: 'Assets', href: '/assets', icon: 'monitor', roles: ['SUPERADMIN','ADMIN','HR_HEAD','HR_OFFICER','IT_HEAD','IT_OFFICER','COMPLIANCE_HEAD','COMPLIANCE_OFFICER','EMPLOYEE'] },
+  { name: 'Users', href: '/users', icon: 'users', roles: ['SUPERADMIN','ADMIN','HR_HEAD','HR_OFFICER','IT_HEAD','COMPLIANCE_HEAD'] },
+  { name: 'Approvals', href: '/approvals', icon: 'clipboard-check', roles: ['SUPERADMIN','ADMIN','HR_HEAD','HR_OFFICER','IT_HEAD','IT_OFFICER','COMPLIANCE_HEAD','COMPLIANCE_OFFICER'] },
+  { name: 'Audit Logs', href: '/audit-logs', icon: 'file-text', roles: ['SUPERADMIN','ADMIN','HR_HEAD','IT_HEAD','COMPLIANCE_HEAD','COMPLIANCE_OFFICER'] },
+  { name: 'Admin', href: '/admin', icon: 'settings', roles: ['SUPERADMIN','ADMIN'] },
 ]
 
 interface SidebarProps {
@@ -25,6 +25,29 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
   const pathname = usePathname()
   const router = useRouter()
   const [signingOut, setSigningOut] = React.useState(false)
+  const [previewRole, setPreviewRole] = React.useState<string | null>(null)
+  React.useEffect(() => {
+    const match = document.cookie.match(/preview-role=([^;]+)/)
+    if (match) setPreviewRole(decodeURIComponent(match[1]))
+    else setPreviewRole(null)
+    const handler = () => {
+      const m = document.cookie.match(/preview-role=([^;]+)/)
+      setPreviewRole(m ? decodeURIComponent(m[1]) : null)
+    }
+    window.addEventListener('focus', handler)
+    return () => window.removeEventListener('focus', handler)
+  }, [pathname])
+
+  const navigation = React.useMemo(() => {
+    if (!previewRole) return baseNavigation
+    return baseNavigation.filter(item => item.roles.includes(previewRole))
+  }, [previewRole])
+
+  const exitPreview = async () => {
+    await fetch('/api/admin/preview', { method: 'DELETE' })
+    setPreviewRole(null)
+    router.refresh()
+  }
 
   // Close mobile on route change
   React.useEffect(() => {
@@ -58,6 +81,14 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
           mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
       >
+        {previewRole && !collapsed && (
+          <div className="px-3 py-2 bg-purple-50 dark:bg-purple-900/20 border-b border-purple-200 dark:border-purple-800 text-xs">
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-purple-700 dark:text-purple-300">Preview: {previewRole}</span>
+              <button onClick={exitPreview} className="text-purple-600 hover:text-purple-800 underline">Exit</button>
+            </div>
+          </div>
+        )}
         <div className="flex h-16 items-center justify-between px-3 border-b border-gray-200 dark:border-gray-700">
           <Link href="/dashboard" className={cn('flex items-center gap-2 text-xl font-bold text-primary-600', collapsed && 'justify-center w-full')}>
             <svg className="h-8 w-8 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
