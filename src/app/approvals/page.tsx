@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { DashboardLayout } from '@/components/layout/dashboard-layout'
 import { DataTable, Column } from '@/components/ui/table'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -27,17 +28,33 @@ interface Approval {
   _action?: 'approve' | 'reject'
 }
 
-export default function ApprovalsPage() {
+function ApprovalsPageContent() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
   const [approvals, setApprovals] = React.useState<Approval[]>([])
   const [loading, setLoading] = React.useState(true)
   const [total, setTotal] = React.useState(0)
-  const [page, setPage] = React.useState(1)
-  const [pageSize, setPageSize] = React.useState(25)
+  const [page, setPage] = React.useState(() => parseInt(searchParams.get('page') || '1'))
+  const [pageSize, setPageSize] = React.useState(() => parseInt(searchParams.get('pageSize') || '25'))
   const [filters, setFilters] = React.useState({
-    status: '',
-    type: '',
+    status: searchParams.get('status') || '',
+    type: searchParams.get('type') || '',
     page: 1,
   })
+  const updateURL = React.useCallback((next: Record<string, string>) => {
+    const params = new URLSearchParams(searchParams.toString())
+    Object.entries(next).forEach(([k, v]) => { if (v) params.set(k, v); else params.delete(k) })
+    router.replace(`${pathname}?${params.toString()}`)
+  }, [searchParams, router, pathname])
+  React.useEffect(() => {
+    const s = searchParams.get('status') || ''
+    const t = searchParams.get('type') || ''
+    const p = parseInt(searchParams.get('page') || '1')
+    setFilters((prev) => (prev.status === s && prev.type === t ? prev : { status: s, type: t, page: 1 }))
+    if (p !== page) setPage(p)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
   const [selectedApproval, setSelectedApproval] = React.useState<Approval | null>(null)
   const [actionLoading, setActionLoading] = React.useState(false)
   
@@ -192,7 +209,7 @@ export default function ApprovalsPage() {
                   { value: 'ESCALATED', label: 'Escalated' },
                 ]}
                 value={filters.status}
-                onChange={(e) => setFilters({ ...filters, status: e.target.value, page: 1 })}
+                onChange={(e) => { setFilters((p) => ({ ...p, status: e.target.value })); updateURL({ status: e.target.value, page: '1' }); setPage(1) }}
               />
               <Select
                 options={[
@@ -203,7 +220,7 @@ export default function ApprovalsPage() {
                   { value: 'ACCESSORY_REQUEST', label: 'Accessory Request' },
                 ]}
                 value={filters.type}
-                onChange={(e) => setFilters({ ...filters, type: e.target.value, page: 1 })}
+                onChange={(e) => { setFilters((p) => ({ ...p, type: e.target.value })); updateURL({ type: e.target.value, page: '1' }); setPage(1) }}
               />
             </div>
           </CardContent>
@@ -224,7 +241,7 @@ export default function ApprovalsPage() {
                   page,
                   pageSize,
                   total,
-                  onPageChange: setPage,
+                  onPageChange: (p) => { setPage(p); updateURL({ page: String(p) }) },
                 }}
               />
             )}
@@ -268,5 +285,13 @@ export default function ApprovalsPage() {
         )}
       </div>
     </DashboardLayout>
+  )
+}
+
+export default function ApprovalsPage() {
+  return (
+    <React.Suspense fallback={<DashboardLayout><div className="p-8"><TableSkeleton rows={5} cols={6} /></div></DashboardLayout>}>
+      <ApprovalsPageContent />
+    </React.Suspense>
   )
 }

@@ -71,6 +71,13 @@
 - [x] Dashboard real data: `GET /api/dashboard/stats` aggregates (counts, recent 5, pending 5, byCategory groupBy) replaces mocks; `formatNumber`
 - [x] Admin editable: CRUD AccessoryType via `/api/accessories`, upsert SystemConfig via `/api/admin/configs`, wired import/backup pages
 
+## Phase 3.7 — Query Sync, Assignment Edit, Departments/Roles CRUD, Preview (2026-09-23 — current directive)
+
+- [x] Query param filtering: sync `assets/users/approvals/audit-logs` filters to URL via `useSearchParams` + `Suspense` + `router.replace` + debounced search; `?department` etc. in location/navbar now filters data (non-breaking, additive)
+- [x] Admin assignment edit: `assets/[id]/edit` Assignment Selects (assignee from `/api/users`, expectedReturnDate) + reassignment logic via `POST /api/assets/assign` (AssetTransfer + audit TRANSFER) or PATCH unassign (UNASSIGN); allow transfer despite assigned status
+- [x] Departments/Roles CRUD (non-breaking): `/api/admin/departments` + `/api/admin/roles` via `SystemConfig` (enum fallback + config override, audit-logged); Admin 6-tab UI with full tables/forms
+- [x] SUPERADMIN preview-as-role: `/api/admin/preview` cookie + Edge middleware override + Sidebar nav filter + banner + Admin Preview tab
+
 ---
 
 ## Phase 4 — Quality & Polish
@@ -112,3 +119,4 @@
 - [x] Edge middleware fix (jose) — 2026-09-16
 - [x] Next.js CVE + ESLint/glob upgrade + exhaustive-deps fix + async cookies migration — 2026-09-16 (15.5.25 / 9.31)
 - [x] UX/routing remediation: 404 fixes (11 pages + 6 APIs), collapsible sidebar + mobile hamburger, skeletons + real dashboard stats, admin editable, import/backup, invite/edit flows — 2026-09-23 (32 routes, build passing)
+- [x] Query-param sync, assignment edit with Selects + audit, non-breaking Departments/Roles CRUD, SUPERADMIN preview-as-role — 2026-09-23 current (35 routes now, build passing)

@@ -79,15 +79,31 @@ export async function PATCH(
         accessories: true,
       },
     })
+
+    // Determine audit action based on assignment change
+    let action: AuditAction = AuditAction.UPDATE
+    let description = `Updated asset ${asset.assetId}`
+    if (data.assignedToId !== undefined && data.assignedToId !== asset.assignedToId) {
+      if (data.assignedToId === null) {
+        action = AuditAction.UNASSIGN
+        description = `Unassigned asset ${asset.assetId} from ${asset.assignedToId || 'previous assignee'}`
+      } else if (asset.assignedToId) {
+        action = AuditAction.TRANSFER
+        description = `Transferred asset ${asset.assetId} from ${asset.assignedToId} to ${data.assignedToId}`
+      } else {
+        action = AuditAction.ASSIGN
+        description = `Assigned asset ${asset.assetId} to ${data.assignedToId}`
+      }
+    }
     
     await createAuditLog({
       actorId: user.id,
-      action: AuditAction.UPDATE,
+      action,
       entityType: 'Asset',
       entityId: id,
       beforeState,
       afterState: updatedAsset,
-      description: `Updated asset ${asset.assetId}`,
+      description,
     })
     
     return NextResponse.json({ asset: updatedAsset })

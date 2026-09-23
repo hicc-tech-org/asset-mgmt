@@ -35,17 +35,34 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/auth/login', request.url))
   }
   
+  // Preview-as role: SUPERADMIN can set preview-role cookie to view as other role (server-side filtering)
+  let effectiveRole = payload.role as string
+  const previewRole = request.cookies.get('preview-role')?.value
+  const allowedPreview = ['SUPERADMIN','ADMIN','HR_HEAD','HR_OFFICER','IT_HEAD','IT_OFFICER','COMPLIANCE_HEAD','COMPLIANCE_OFFICER','EMPLOYEE']
+  if (previewRole && payload.role === 'SUPERADMIN' && allowedPreview.includes(previewRole)) {
+    effectiveRole = previewRole
+  }
+
   // Add user info to headers for server components
   const requestHeaders = new Headers(request.headers)
   requestHeaders.set('x-user-id', payload.id as string)
-  requestHeaders.set('x-user-role', payload.role as string)
+  requestHeaders.set('x-user-role', effectiveRole)
   requestHeaders.set('x-user-department', payload.department as string)
+  if (previewRole && effectiveRole !== payload.role) {
+    requestHeaders.set('x-preview-role', previewRole)
+    requestHeaders.set('x-real-role', payload.role as string)
+  }
   
-  return NextResponse.next({
+  const response = NextResponse.next({
     request: {
       headers: requestHeaders,
     },
   })
+  // Expose preview header to client via response header (optional)
+  if (previewRole && effectiveRole !== payload.role) {
+    response.headers.set('x-preview-role', previewRole)
+  }
+  return response
 }
 
 export const config = {

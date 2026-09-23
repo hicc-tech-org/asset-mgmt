@@ -130,6 +130,26 @@ Resolved all user-reported discrepancies from the `execute-feature` directive: m
 
 ---
 
+## 2026-09-23 — Query Sync, Assignment Edit, Departments/Roles CRUD, Preview-As-Role
+
+**Summary:**
+Implemented follow-up directive: query params in location/navbar now drive filtering, admin can edit asset assignments via Selects with audit, departments/roles/perm scopes are end-to-end CRUD non-breaking, and SUPERADMIN can preview as any role without sign-out. Build passes (35 routes).
+
+**Completed:**
+- Query param filtering: `assets/page.tsx` (`?status&?category&?search&?department`), `users/page.tsx` (`?department&?role&?search`), `approvals/page.tsx` (`?status&?type`), `audit-logs/page.tsx` (`?entityType&?action&?actorId`) now read `useSearchParams` inside `Suspense` + `useRouter`/`usePathname` to sync `router.replace` on filter change; debounced search (400ms) + pagination `?page`; `admin` department cards linking to `/users?department=HR` now correctly filter.
+- Assignment edit (admin): Extended `assets/[id]/edit` with Assignment section (Select assignee from `GET /api/users?pageSize=100` + `expectedReturnDate`), submit logic: unassign via `PATCH assignedToId=null` (audit UNASSIGN) or reassign via `POST /api/assets/assign` (creates `AssetTransfer`, audit TRANSFER). Updated `POST /api/assets/assign` to allow reassignment (remove “already assigned” block, create `AssetTransfer` + audit TRANSFER with metadata) and `PATCH /api/assets/[id]` to detect assignment delta and audit TRANSFER/UNASSIGN/ASSIGN vs generic UPDATE. All audit-logged.
+- Departments/Roles CRUD (non-breaking): Created `/api/admin/departments` + `/api/admin/roles` backed by `SystemConfig` (`category=department|role`, `key=dept_*|role_*`); GET merges enum fallback (8 depts, 9 roles) + configs; POST creates new config; PATCH updates or creates override for enum edit; DELETE removes config (enum delete blocked). `admin/page.tsx` now 6 tabs (adds Preview); Departments tab full CRUD table + add/edit form, Roles tab full CRUD with department/permission fields, all audit-logged.
+- Preview as: New `POST|DELETE|GET /api/admin/preview` manages `preview-role` cookie (SUPERADMIN only); `src/middleware.ts` overrides `x-user-role` + sets `x-preview-role`/`x-real-role` when cookie present and real role SUPERADMIN; `Sidebar` (`baseNavigation` with roles array) filters nav by `previewRole` cookie and shows purple preview banner with Exit; `admin/page.tsx` Preview tab selector + Exit + links to Dashboard/Assets.
+- Build verified: `prisma generate && next build` → `✓ Compiled successfully` (35 routes now: + departments, roles, preview), `ƒ Middleware 39.1 kB`, no Edge warnings, `✔ No ESLint warnings` except one `searchParams` dep note (benign).
+
+**Key Changes:**
+- Route count 32→35; `Sidebar` nav now role-filtered via `baseNavigation` roles array; `middleware` preview override; `assets/[id]/edit` now Select-driven reassignment; SystemConfig reused for extensible department/role definitions without schema migration.
+
+**Next Sprint Focus:**
+- Add CI `npm run build` gate + smoke test for `?department` filtered links; evaluate `prisma.$transaction` for department/role + asset bulk atomicity; add `npm audit` check.
+
+---
+
 ## [DATE] — Project Initialization — Template (retain)
 
 **Summary:**

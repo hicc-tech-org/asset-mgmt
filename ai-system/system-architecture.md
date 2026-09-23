@@ -4,7 +4,7 @@
 > - last-updated-by: update-ai-system
 > - last-verified-against-code: 2026-09-23
 > - staleness-policy: re-verify before trusting if any architecture-affecting commits have been made since last-verified-against-code
-> - notable-update: 2026-09-23 full UX/routing remediation (collapsible sidebar, skeletons, dashboard real stats, import/backup, admin editable, 32 routes)
+> - notable-update: 2026-09-23 query-param filtering, reassignment with audit, departments/roles CRUD (non-breaking), SUPERADMIN preview-as-role
 
 > **Overview:** How the system is structured — layers, modules, data flow, and configuration. Agents designing or changing structure must read this first.
 
@@ -38,12 +38,12 @@ Data Store (PostgreSQL)
 |--------|---------------|-----------|--------------|
 | Authentication (Node) | User auth, sessions, JWT (API routes) | `src/lib/auth.ts`, `src/app/api/auth/` | bcryptjs, jsonwebtoken, Prisma User model |
 | Edge Auth | Request gating, JWT verify in Edge | `src/middleware.ts` | jose (jwtVerify), Next.js Edge Runtime — no bcryptjs/jsonwebtoken |
-| Asset Management | Asset CRUD, assignment, return, accessories, bulk import | `src/app/api/assets/`, `src/app/assets/`, `src/app/api/admin/import` | Prisma Asset model, Audit logging |
-| User Management | User CRUD, roles, departments, invitations | `src/app/api/users/`, `src/app/users/` | Prisma User model, Audit logging |
-| Approval Workflow | Multi-level approval chains | `src/app/api/approvals/`, `src/app/approvals/` | Prisma Approval model, User/Asset models |
-| Audit Logging | Automatic trail for all state changes | `src/lib/audit.ts`, `src/app/api/audit-logs/` | Prisma AuditLog model |
+| Asset Management | Asset CRUD, assignment/reassignment (Selects), return, accessories, bulk import; URL-filtered listing | `src/app/api/assets/`, `src/app/assets/` (page URL-synced, edit assignment Selects), `src/app/api/admin/import` | Prisma Asset model, Audit logging (ASSIGN/TRANSFER/UNASSIGN), AssetTransfer |
+| User Management | User CRUD, roles, departments, invitations; URL-filtered listing (?department etc.) | `src/app/api/users/`, `src/app/users/` (page URL-synced) | Prisma User model, Audit logging |
+| Approval Workflow | Multi-level approval chains; URL-filtered listing | `src/app/api/approvals/`, `src/app/approvals/` (page URL-synced) | Prisma Approval model, User/Asset models |
+| Audit Logging | Automatic trail for all state changes (including Department/Role, reassignment) | `src/lib/audit.ts`, `src/app/api/audit-logs/` (page URL-synced) | Prisma AuditLog model |
 | Dashboard | Real aggregates, byCategory, recent assets, pending approvals | `src/app/api/dashboard/stats`, `src/app/dashboard/` | Prisma groupBy/count, formatNumber |
-| Admin Config | Accessory types, system settings, backup | `src/app/api/accessories`, `src/app/api/admin/configs|backup|import` | Prisma AccessoryType, SystemConfig |
+| Admin Config | Accessory types, departments/roles CRUD (non-breaking via SystemConfig), system settings, preview-as-role, backup | `src/app/api/accessories`, `src/app/api/admin/configs|departments|roles|preview|backup|import` | Prisma AccessoryType, SystemConfig, User (preview) |
 | UI Components | Reusable design system + skeletons | `src/components/ui/` (incl. skeleton.tsx) | Tailwind CSS, Radix UI primitives |
 | Layout | Collapsible dashboard shell, mobile drawer | `src/components/layout/` (Sidebar collapsible + overlay, Header minimal) | Next.js Link, React state + localStorage |
 
@@ -71,17 +71,19 @@ Data Store (PostgreSQL)
 5. → API routes use src/lib/auth.ts:verifyToken (Node) for direct cookie fallback where needed
 ```
 
-### Asset Assignment Flow
+### Asset Assignment Flow (incl. reassignment)
 
 ```
-1. POST /api/assets/assign { assetId, assigneeId, accessories }
-2. → Validate permissions (IT/SuperAdmin only)
-3. → Check asset availability
-4. → Update asset: assignedToId, assignedById, assignedAt, status
-5. → Assign accessories (bulk update)
-6. → Create Acknowledgement record (ISSUE type, unsigned)
-7. → Create AuditLog (ASSIGN action)
-8. → Return updated asset
+1. POST /api/assets/assign { assetId, assigneeId, expectedReturnDate, accessories, notes }
+2. → Validate permissions (IT/SuperAdmin only; ADMIN also allowed for edit page)
+3. → Check asset availability; detect isReassignment = assigned && different assignee
+4. → Update asset: assignedToId, assignedById, assignedAt, status ASSIGNED, expectedReturnDate
+5. → If isReassignment: create AssetTransfer { fromUserId, toUserId, approvedById }
+6. → Assign accessories (bulk update via parentAssetId or explicit accessoryIds)
+7. → Create Acknowledgement record (ISSUE type, unsigned) — or existing reassignment
+8. → Create AuditLog: TRANSFER if reassignment, else ASSIGN (with metadata previousAssigneeId)
+9. → Also accessible via assets/[id]/edit Selects: unassign (PATCH assignedToId=null → UNASSIGN audit) or reassign via same endpoint
+10. → Return updated asset
 ```
 
 ### Approval Flow
@@ -201,15 +203,19 @@ All config points follow the fallback discipline from `standards/engineering-pri
 | Docs | `repo-map.md`/`dependency-graph.md` stale wrt Edge split and build | Fixed | Updated in this sync and follow-up sync |
 | Remaining | `next lint` deprecated in Next 15; `prisma@5.10.0` update available (8.0.0-rc) | Low — open | Migrate lint script to `eslint .` via `npx @next/codemod@canary next-lint-to-eslint-cli` when ready; evaluate Prisma 6/8 major upgrade separately |
 
-## Discrepancy Report (2026-09-23 deep sync)
+## Discrepancy Report (2026-09-23 deep sync — query/assignment/departments/preview)
 
 | Area | Finding | Severity | Action |
 |------|---------|----------|--------|
-| Routing 404s | Missing pages caused RSC 404s: `assets/new`, `assets/[id]/edit|assign|return`, `users/new|/[id]`, `admin/backup|import|accessories/new`, `auth/logout`, `api/assets/new` (client used wrong path), `users/*`, `admin/*` | High — fixed (2026-09-23) | Created 11 pages + 6 API routes (`dashboard/stats`, `accessories`, `admin/configs|import|backup`, `auth/logout GET`); `next build` 32 routes vs 21, no 404s |
-| Layout | Sidebar not collapsible, no signout, redundant Header navbar, hamburger no-op (`Failed to fetch assets`, mobile unusable) | High — fixed (2026-09-23) | Sidebar collapsible + mobile drawer + overlay + localStorage, Header minimal (hamburger toggles mobileOpen), signout in both, DashboardLayout orchestrates `collapsed`/`mobileOpen` |
-| Data visibility | Pages showed “No assets/users” despite seed, no loading state, dashboard mock numbers | High — fixed (2026-09-23) | Added `skeleton.tsx`, all list pages gate DataTable behind `loading ? TableSkeleton`, dashboard fetches real aggregates via `/api/dashboard/stats` (`groupBy` counts, formatted) |
-| Admin read-only | Admin tabs static, no edit for accessory types or settings | Medium — fixed (2026-09-23) | Admin now CRUDs AccessoryType via `/api/accessories` (edit modal, delete) and SystemConfig via `/api/admin/configs` (PATCH upsert) ; import/backup wired |
-| Add/Edit/Import/Invite | No forms for asset creation, user invite, bulk import | Medium — fixed (2026-09-23) | Built `assets/new`, `assets/[id]/edit`, `users/new`, `admin/import` (CSV/JSON bulk), `admin/accessories/new` — all validated, audit-logged |
+| Query param filtering | Links like `/users?department=HR` or `/assets?status=...` in navbar/location did not filter — filters were local React state without URL sync | Medium — fixed (2026-09-23 current) | Wrapped list pages (`assets`, `users`, `approvals`, `audit-logs`) in `Suspense` + `useSearchParams`/`useRouter`/`usePathname`; synced `status/category/search/department/role/entityType/action/actorId/page` to URL via `router.replace`, debounced search (400ms), pagination URL sync; `admin` dept cards link to filtered users now works |
+| Assignment edit (admin) | Admin could not edit asset assignment post-creation; `POST /api/assets/assign` rejected reassignment with “already assigned” error; no Selects, no audit for transfer | Medium — fixed (2026-09-23 current) | Enhanced `assets/[id]/edit` with Assignment Selects (users fetch, expectedReturnDate), submit logic calls `POST /api/assets/assign` for reassign (creates AssetTransfer, audit TRANSFER) or PATCH unassign (audit UNASSIGN); updated `assign/route.ts` to allow transfer + create AssetTransfer + audit TRANSFER; updated `PATCH /api/assets/[id]` to detect assignment change → audit TRANSFER/UNASSIGN/ASSIGN |
+| Departments/Roles CRUD | Admin Departments/Roles tabs were static display (7 depts hardcoded, 9 roles table) — no CRUD, not editable, not audit-logged | Medium — fixed (2026-09-23 current) | Added `/api/admin/departments` + `/api/admin/roles` backed by `SystemConfig` category (non-breaking: merges enum fallback + config; enum delete blocked, enum edit creates override); Admin page now 6 tabs with full CRUD tables/forms, audit-logged |
+| Preview as role (superadmin) | Superadmin had to sign out/in to see other roles’ interfaces | Medium — fixed (2026-09-23 current) | New `/api/admin/preview` (POST/DELETE/GET `preview-role` cookie, SUPERADMIN only); middleware overrides `x-user-role` with preview when SUPERADMIN; Sidebar `baseNavigation` filters by preview role + shows purple banner with Exit; Admin Preview tab selector |
+| Routing 404s (earlier) | Missing pages caused RSC 404s: `assets/new`, `assets/[id]/edit|assign|return`, `users/new|/[id]`, `admin/backup|import|accessories/new`, `auth/logout`, `api/assets/new` (client used wrong path), `users/*`, `admin/*` | High — fixed (2026-09-23) | Created 11 pages + 6 API routes (`dashboard/stats`, `accessories`, `admin/configs|import|backup`, `auth/logout GET`); `next build` 32 routes vs 21, no 404s |
+| Layout (earlier) | Sidebar not collapsible, no signout, redundant Header navbar, hamburger no-op (`Failed to fetch assets`, mobile unusable) | High — fixed (2026-09-23) | Sidebar collapsible + mobile drawer + overlay + localStorage, Header minimal (hamburger toggles mobileOpen), signout in both, DashboardLayout orchestrates `collapsed`/`mobileOpen` |
+| Data visibility (earlier) | Pages showed “No assets/users” despite seed, no loading state, dashboard mock numbers | High — fixed (2026-09-23) | Added `skeleton.tsx`, all list pages gate DataTable behind `loading ? TableSkeleton`, dashboard fetches real aggregates via `/api/dashboard/stats` (`groupBy` counts, formatted) |
+| Admin read-only (earlier) | Admin tabs static, no edit for accessory types or settings | Medium — fixed (2026-09-23) | Admin now CRUDs AccessoryType via `/api/accessories` (edit modal, delete) and SystemConfig via `/api/admin/configs` (PATCH upsert) ; import/backup wired |
+| Add/Edit/Import/Invite (earlier) | No forms for asset creation, user invite, bulk import | Medium — fixed (2026-09-23) | Built `assets/new`, `assets/[id]/edit`, `users/new`, `admin/import` (CSV/JSON bulk), `admin/accessories/new` — all validated, audit-logged |
 
 ---
 
