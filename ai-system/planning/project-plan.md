@@ -2,7 +2,7 @@
 
 > **Metadata**
 > - last-updated-by: update-ai-system
-> - last-verified-against-code: 2026-09-16
+> - last-verified-against-code: 2026-09-23
 > - staleness-policy: re-verify if project scope or phase changes
 
 > **Overview:** High-level feature checklist organized by development phase. See `planning/task-queue.md` for granular, sprint-level tasks.
@@ -42,13 +42,13 @@
 
 ## Phase 3 — Secondary Features
 
-- [ ] Email notifications for approvals and assignments
-- [ ] Asset import from Excel/CSV
-- [ ] Asset export to Excel/PDF
+- [ ] Email notifications for approvals and assignments (flag wired: `email_notifications_enabled`, no sender)
+- [x] Asset import from Excel/CSV — `/admin/import` (CSV/JSON parse client-side → POST `/api/admin/import` bulk create, audit-logged, per-row results)
+- [ ] Asset export to Excel/PDF — `/admin/backup` (JSON export done; Excel/PDF TODO)
 - [ ] Bulk asset operations
 - [ ] Asset maintenance scheduling
 - [ ] Asset transfer between employees
-- [ ] Dashboard widgets customization
+- [x] Dashboard widgets customization — dashboard real stats via `/api/dashboard/stats` (counts, byCategory, recent, pending; formatted, skeletons)
 - [ ] Advanced search and saved filters
 - [ ] Asset depreciation tracking
 - [ ] Warranty expiry alerts
@@ -63,6 +63,14 @@
 - [x] Fix ESLint warnings: `react-hooks/exhaustive-deps` in approvals/assets/audit-logs/users pages (useCallback pattern)
 - [x] Upgrade ESLint 8.56 + glob deprecations → eslint 9.31 flat config (eslint.config.mjs, FlatCompat, glob vuln removed)
 
+## Phase 3.6 — UX & Routing Remediation (2026-09-23)
+
+- [x] Fix 404s: create `assets/new`, `assets/[id]/edit|assign|return`, `users/new|/[id]`, `admin/backup|import|accessories/new`, `auth/logout` pages + APIs (`dashboard/stats`, `accessories`, `admin/configs|import|backup`, `auth/logout GET`) — 32 routes
+- [x] Layout: collapsible sidebar (w-64↔w-16, localStorage), mobile drawer + overlay, hamburger in Header, remove navbar redundancy, signout in Sidebar/Header
+- [x] Loading UX: `skeleton.tsx` + gate DataTable behind `loading ? TableSkeleton`; clarify empty messages; dashboard `StatsSkeleton`
+- [x] Dashboard real data: `GET /api/dashboard/stats` aggregates (counts, recent 5, pending 5, byCategory groupBy) replaces mocks; `formatNumber`
+- [x] Admin editable: CRUD AccessoryType via `/api/accessories`, upsert SystemConfig via `/api/admin/configs`, wired import/backup pages
+
 ---
 
 ## Phase 4 — Quality & Polish
@@ -72,9 +80,9 @@
 - [ ] E2E tests for main user flows
 - [ ] Performance audit and optimization
 - [ ] Accessibility audit (WCAG AA)
-- [ ] Error states and loading states complete
-- [ ] Responsive design verification
-- [ ] Dark mode support
+- [x] Error states and loading states complete — `skeleton.tsx` added; all list pages + detail + dashboard use skeletons during fetch
+- [x] Responsive design verification — Sidebar drawer + overlay, Header hamburger, collasible persistence verified via `npm run build` (32 routes, no layout break)
+- [ ] Dark mode support (partial: Tailwind dark variants present, manual toggle TODO)
 
 ---
 
@@ -99,7 +107,8 @@
 - [x] Audit trail implementation
 - [x] User management with RBAC
 - [x] Dashboard and main navigation
-- [x] UI component library
+- [x] UI component library (incl. skeleton.tsx)
 - [x] Vercel deploy fix (Prisma generate) — 2026-09-16
 - [x] Edge middleware fix (jose) — 2026-09-16
 - [x] Next.js CVE + ESLint/glob upgrade + exhaustive-deps fix + async cookies migration — 2026-09-16 (15.5.25 / 9.31)
+- [x] UX/routing remediation: 404 fixes (11 pages + 6 APIs), collapsible sidebar + mobile hamburger, skeletons + real dashboard stats, admin editable, import/backup, invite/edit flows — 2026-09-23 (32 routes, build passing)

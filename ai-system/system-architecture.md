@@ -2,9 +2,9 @@
 
 > **Metadata**
 > - last-updated-by: update-ai-system
-> - last-verified-against-code: 2026-09-16
+> - last-verified-against-code: 2026-09-23
 > - staleness-policy: re-verify before trusting if any architecture-affecting commits have been made since last-verified-against-code
-> - notable-update: 2026-09-16 Next.js 15.5.25 + eslint 9.31 flat config + async cookies + exhaustive-deps fix
+> - notable-update: 2026-09-23 full UX/routing remediation (collapsible sidebar, skeletons, dashboard real stats, import/backup, admin editable, 32 routes)
 
 > **Overview:** How the system is structured — layers, modules, data flow, and configuration. Agents designing or changing structure must read this first.
 
@@ -38,12 +38,14 @@ Data Store (PostgreSQL)
 |--------|---------------|-----------|--------------|
 | Authentication (Node) | User auth, sessions, JWT (API routes) | `src/lib/auth.ts`, `src/app/api/auth/` | bcryptjs, jsonwebtoken, Prisma User model |
 | Edge Auth | Request gating, JWT verify in Edge | `src/middleware.ts` | jose (jwtVerify), Next.js Edge Runtime — no bcryptjs/jsonwebtoken |
-| Asset Management | Asset CRUD, assignment, return, accessories | `src/app/api/assets/`, `src/app/assets/` | Prisma Asset model, Audit logging |
+| Asset Management | Asset CRUD, assignment, return, accessories, bulk import | `src/app/api/assets/`, `src/app/assets/`, `src/app/api/admin/import` | Prisma Asset model, Audit logging |
 | User Management | User CRUD, roles, departments, invitations | `src/app/api/users/`, `src/app/users/` | Prisma User model, Audit logging |
 | Approval Workflow | Multi-level approval chains | `src/app/api/approvals/`, `src/app/approvals/` | Prisma Approval model, User/Asset models |
 | Audit Logging | Automatic trail for all state changes | `src/lib/audit.ts`, `src/app/api/audit-logs/` | Prisma AuditLog model |
-| UI Components | Reusable design system | `src/components/ui/` | Tailwind CSS, Radix UI primitives |
-| Layout | Dashboard shell, navigation | `src/components/layout/` | Next.js Link, React Context |
+| Dashboard | Real aggregates, byCategory, recent assets, pending approvals | `src/app/api/dashboard/stats`, `src/app/dashboard/` | Prisma groupBy/count, formatNumber |
+| Admin Config | Accessory types, system settings, backup | `src/app/api/accessories`, `src/app/api/admin/configs|backup|import` | Prisma AccessoryType, SystemConfig |
+| UI Components | Reusable design system + skeletons | `src/components/ui/` (incl. skeleton.tsx) | Tailwind CSS, Radix UI primitives |
+| Layout | Collapsible dashboard shell, mobile drawer | `src/components/layout/` (Sidebar collapsible + overlay, Header minimal) | Next.js Link, React state + localStorage |
 
 ---
 
@@ -174,13 +176,14 @@ All config points follow the fallback discipline from `standards/engineering-pri
 ## Known Constraints & Technical Debt
 
 - No automated tests yet (need to implement test pyramid per §19)
-- No email notification service integrated (placeholder in SystemConfig)
+- No email notification service integrated (placeholder in SystemConfig — `email_notifications_enabled` flag wired but no sender)
 - Approval chain building logic is in API route, should be extracted to service
 - Asset accessory creation during asset creation needs transaction wrapper
 - No file upload for asset images/documents
 - No real-time updates (polling only)
 - `next@15.5.25` uses `eslint@9.31.0` via FlatCompat; `next lint` is deprecated in Next 15 (use `eslint .` via `npx @next/codemod next-lint-to-eslint-cli` for future CLI migration)
 - `src/lib/auth.ts` now async cookies API (Next 15 `cookies()` returns Promise) — `setAuthCookie`/`clearAuthCookie` are async and must be awaited in route handlers
+- Import bulk creation loops without transaction — partial success tracked via `results` array but not atomic; consider `prisma.$transaction` for all-or-nothing mode
 
 ---
 
@@ -197,6 +200,16 @@ All config points follow the fallback discipline from `standards/engineering-pri
 | Config | `next.config.js` lacks `prisma` generate awareness | Fixed | Documented via `package.json` scripts |
 | Docs | `repo-map.md`/`dependency-graph.md` stale wrt Edge split and build | Fixed | Updated in this sync and follow-up sync |
 | Remaining | `next lint` deprecated in Next 15; `prisma@5.10.0` update available (8.0.0-rc) | Low — open | Migrate lint script to `eslint .` via `npx @next/codemod@canary next-lint-to-eslint-cli` when ready; evaluate Prisma 6/8 major upgrade separately |
+
+## Discrepancy Report (2026-09-23 deep sync)
+
+| Area | Finding | Severity | Action |
+|------|---------|----------|--------|
+| Routing 404s | Missing pages caused RSC 404s: `assets/new`, `assets/[id]/edit|assign|return`, `users/new|/[id]`, `admin/backup|import|accessories/new`, `auth/logout`, `api/assets/new` (client used wrong path), `users/*`, `admin/*` | High — fixed (2026-09-23) | Created 11 pages + 6 API routes (`dashboard/stats`, `accessories`, `admin/configs|import|backup`, `auth/logout GET`); `next build` 32 routes vs 21, no 404s |
+| Layout | Sidebar not collapsible, no signout, redundant Header navbar, hamburger no-op (`Failed to fetch assets`, mobile unusable) | High — fixed (2026-09-23) | Sidebar collapsible + mobile drawer + overlay + localStorage, Header minimal (hamburger toggles mobileOpen), signout in both, DashboardLayout orchestrates `collapsed`/`mobileOpen` |
+| Data visibility | Pages showed “No assets/users” despite seed, no loading state, dashboard mock numbers | High — fixed (2026-09-23) | Added `skeleton.tsx`, all list pages gate DataTable behind `loading ? TableSkeleton`, dashboard fetches real aggregates via `/api/dashboard/stats` (`groupBy` counts, formatted) |
+| Admin read-only | Admin tabs static, no edit for accessory types or settings | Medium — fixed (2026-09-23) | Admin now CRUDs AccessoryType via `/api/accessories` (edit modal, delete) and SystemConfig via `/api/admin/configs` (PATCH upsert) ; import/backup wired |
+| Add/Edit/Import/Invite | No forms for asset creation, user invite, bulk import | Medium — fixed (2026-09-23) | Built `assets/new`, `assets/[id]/edit`, `users/new`, `admin/import` (CSV/JSON bulk), `admin/accessories/new` — all validated, audit-logged |
 
 ---
 

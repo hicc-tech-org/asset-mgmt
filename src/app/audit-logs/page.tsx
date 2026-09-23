@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { formatDateTime } from '@/lib/utils'
+import { TableSkeleton } from '@/components/ui/skeleton'
 
 interface AuditLog {
   id: string
@@ -149,18 +150,22 @@ export default function AuditLogsPage() {
         {/* Audit Logs Table */}
         <Card>
           <CardContent className="p-0">
-            <DataTable
-              columns={columns}
-              data={logs}
-              keyAccessor={(row) => row.id}
-              emptyMessage="No audit logs found"
-              pagination={{
-                page,
-                pageSize,
-                total,
-                onPageChange: setPage,
-              }}
-            />
+            {loading ? (
+              <TableSkeleton rows={8} cols={5} />
+            ) : (
+              <DataTable
+                columns={columns}
+                data={logs}
+                keyAccessor={(row) => row.id}
+                emptyMessage="No audit logs found"
+                pagination={{
+                  page,
+                  pageSize,
+                  total,
+                  onPageChange: setPage,
+                }}
+              />
+            )}
           </CardContent>
         </Card>
       </div>

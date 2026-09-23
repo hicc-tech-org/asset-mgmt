@@ -3,7 +3,7 @@
 > **Metadata**
 >
 > - last-updated-by: update-ai-system
-> - last-verified-against-code: 2026-09-16
+> - last-verified-against-code: 2026-09-23
 > - staleness-policy: historical entries do not go stale
 
 > **Overview:** Chronological log of completed development work. Each sprint ends with a summary entry. Agents add entries after completing tasks. Useful for understanding what has been built, when decisions were made, and what patterns have emerged.
@@ -106,6 +106,27 @@ Completed remaining discrepancies flagged in the 2026-09-16 deep sync: upgraded 
 
 **Next Sprint Focus:**
 Phase 3 secondary features; add CI `npm run build` gate + `npm audit` check per lessons-learned action items
+
+---
+
+## 2026-09-23 — Full UX/Routing Remediation (404s, Layout, Skeletons, Dashboard, Admin)
+
+**Summary:**
+Resolved all user-reported discrepancies from the `execute-feature` directive: missing add/edit/import/invite pages (11 × 404 RSC), redundant navbar + broken hamburger + static sidebar, empty states without skeletons, mock dashboard, and read-only admin. Implemented non-breaking additive changes; verified via `prisma generate && next build` (32 routes, `✓ Compiled successfully`).
+
+**Completed:**
+- 404 fixes: Created `assets/new` (POST /api/assets), `assets/[id]/edit` (PATCH), `assets/[id]/assign` (POST /api/assets/assign), `assets/[id]/return` (POST /api/assets/return), `users/new` (POST /api/users), `users/[id]` (GET/PATCH/DELETE inline edit), `admin/import` (CSV/JSON → POST /api/admin/import), `admin/backup` (GET /api/admin/backup → download), `admin/accessories/new` (POST /api/accessories), `auth/logout` (POST+GET /api/auth/logout + page). Added APIs: `dashboard/stats` (counts + groupBy), `accessories` + `[id]`, `admin/configs`, `admin/import`, `admin/backup`, `auth/logout GET` redirect.
+- Layout: Sidebar collapsible (w-64↔w-16, `localStorage sidebar-collapsed`), mobile drawer with `mobileOpen` + overlay + close-on-route-change, Header hamburger toggles drawer, navbar duplicated list removed from Header (Sidebar owns nav), signout button in Sidebar (and Header fallback) via `POST /api/auth/logout` → `router.push('/auth/login')`. DashboardLayout orchestrates `collapsed`/`mobileOpen` and applies `lg:pl-64` vs `lg:pl-16`.
+- Loading UX: New `src/components/ui/skeleton.tsx` (`Skeleton`, `TableSkeleton`, `CardSkeleton`, `StatsSkeleton`). All list pages (`assets`, `users`, `approvals`, `audit-logs`) gate `DataTable` behind `loading ? TableSkeleton`; `assets/[id]` shows `Skeleton` stack; dashboard shows `StatsSkeleton`/`Skeleton` during fetch. Empty messages clarified for filtered/seed states.
+- Dashboard real data: Replaced mocks with `fetch('/api/dashboard/stats')` → `stats{totalAssets, assigned, available, pendingApprovals, maintenance, retired, totalUsers}`, `recentAssets` (5 with assignee), `pendingApprovals` (5 with requester/asset), `byCategory` groupBy; `formatNumber` applied; error handling; no more `Failed to fetch assets: TypeError` (follows same auth cookie pattern).
+- Admin editable: `admin/page.tsx` now fetches `AccessoryType` via `/api/accessories` (list, inline edit modal PATCH /api/accessories/[id], DELETE) and `SystemConfig` via `/api/admin/configs` (GET all, PATCH upsert for `high_value_threshold`, `approval_reminder_days`, `email_notifications_enabled`). Import handles CSV/JSON client parse → bulk POST; backup generates + downloads JSON.
+- Build verified: `npx prisma generate` + `npm run build` → `✓ Compiled successfully`, 32 routes, middleware 39kB, zero Edge warnings, no 404s. See `ai-system/index/repo-map.md` 2026-09-23 drift notes and `system-architecture.md` discrepancy report.
+
+**Key Changes:**
+- Route count 21→32; new `skeleton.tsx` primitive; layout state lift to `DashboardLayout`; real stats API; admin evolves from static to CRUD.
+
+**Next Sprint Focus:**
+- Wire import to handle accessory columns + validation; add Excel export; add CI build gate + `npm audit`; consider `prisma.$transaction` for bulk import atomicity.
 
 ---
 

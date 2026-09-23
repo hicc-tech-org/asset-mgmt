@@ -2,7 +2,7 @@
 
 > **Metadata**
 > - last-updated-by: update-ai-system
-> - last-verified-against-code: 2026-09-16
+> - last-verified-against-code: 2026-09-23
 > - staleness-policy: re-verify if folder structure changes
 
 > **Overview:** Folder structure with purpose of each directory.
@@ -118,7 +118,9 @@ ai-system/
 ```
 prisma/
 ├── schema.prisma             # Database schema
-├── seed.ts                   # Seed script
+├── seed.ts                   # Seed script (idempotent, deseedable, deterministic IDs)
+├── deseed.ts                 # Deseed script (removes only seeded rows)
+├── seed-manifest.json        # Generated manifest (generated at seed time)
 └── migrations/               # Migration history (generated)
 ```
 
@@ -132,7 +134,7 @@ src/
 │   ├── api/                  # API routes
 │   │   ├── auth/
 │   │   │   ├── login/route.ts
-│   │   │   ├── logout/route.ts
+│   │   │   ├── logout/route.ts       # POST + GET (GET redirects to /auth/login)
 │   │   │   ├── me/route.ts
 │   │   │   └── register/route.ts
 │   │   ├── assets/
@@ -146,30 +148,44 @@ src/
 │   │   ├── approvals/
 │   │   │   ├── route.ts              # GET list, POST create
 │   │   │   └── [id]/route.ts         # PATCH approve/reject (async params)
-│   │   └── audit-logs/
-│   │       └── route.ts              # GET with filters
+│   │   ├── audit-logs/
+│   │   │   └── route.ts              # GET with filters
+│   │   ├── dashboard/
+│   │   │   └── stats/route.ts        # GET dashboard aggregates (counts, recent, pending, byCategory)
+│   │   ├── accessories/
+│   │   │   ├── route.ts              # GET list, POST create (AccessoryType)
+│   │   │   └── [id]/route.ts         # PATCH, DELETE (AccessoryType)
+│   │   └── admin/
+│   │       ├── configs/route.ts      # GET all, PATCH upsert (SystemConfig)
+│   │       ├── import/route.ts       # POST bulk import assets (JSON/CSV parsed client-side)
+│   │       └── backup/route.ts       # GET export all data (assets/users/approvals/logs)
 │   ├── auth/
-│   │   └── login/page.tsx            # Login page
+│   │   ├── login/page.tsx            # Login page
+│   │   └── logout/page.tsx           # Logout (POST /api/auth/logout then redirect)
 │   ├── dashboard/
-│   │   └── page.tsx                  # Main dashboard
+│   │   └── page.tsx                  # Main dashboard (real stats via /api/dashboard/stats, skeletons, byCategory)
 │   ├── assets/
-│   │   ├── page.tsx                  # Asset list
-│   │   ├── new/page.tsx              # Create asset (TODO)
+│   │   ├── page.tsx                  # Asset list (TableSkeleton, filters, pagination)
+│   │   ├── new/page.tsx              # Create asset (form → POST /api/assets)
 │   │   ├── [id]/
-│   │   │   ├── page.tsx              # Asset detail
-│   │   │   ├── edit/page.tsx         # Edit asset (TODO)
-│   │   │   ├── assign/page.tsx       # Assign asset (TODO)
-│   │   │   └── return/page.tsx       # Return asset (TODO)
+│   │   │   ├── page.tsx              # Asset detail (skeleton, auditLogs, accessories)
+│   │   │   ├── edit/page.tsx         # Edit asset (PATCH /api/assets/[id])
+│   │   │   ├── assign/page.tsx       # Assign asset (POST /api/assets/assign)
+│   │   │   └── return/page.tsx       # Return asset (POST /api/assets/return)
 │   ├── users/
-│   │   ├── page.tsx                  # User list
-│   │   ├── new/page.tsx              # Invite user (TODO)
-│   │   └── [id]/page.tsx             # User detail (TODO)
+│   │   ├── page.tsx                  # User list (TableSkeleton, filters, pagination)
+│   │   ├── new/page.tsx              # Invite user (POST /api/users)
+│   │   └── [id]/page.tsx             # User detail + inline edit (PATCH/DELETE /api/users/[id])
 │   ├── approvals/
-│   │   └── page.tsx                  # Approvals list
+│   │   └── page.tsx                  # Approvals list (TableSkeleton, approve/reject modal)
 │   ├── audit-logs/
-│   │   └── page.tsx                  # Audit logs list
+│   │   └── page.tsx                  # Audit logs list (TableSkeleton, filters)
 │   ├── admin/
-│   │   └── page.tsx                  # Admin panel
+│   │   ├── page.tsx                  # Admin panel (editable: AccessoryTypes CRUD + SystemConfig settings via APIs)
+│   │   ├── import/page.tsx           # Bulk import (CSV/JSON → POST /api/admin/import)
+│   │   ├── backup/page.tsx           # Backup (GET /api/admin/backup → download JSON)
+│   │   └── accessories/
+│   │       └── new/page.tsx          # Add AccessoryType (POST /api/accessories)
 │   ├── globals.css                   # Global styles + Tailwind
 │   ├── layout.tsx                    # Root layout
 │   └── page.tsx                      # Home redirect
@@ -182,13 +198,14 @@ src/
 │   │   ├── table.tsx
 │   │   ├── select.tsx
 │   │   ├── textarea.tsx
-│   │   └── tabs.tsx
+│   │   ├── tabs.tsx
+│   │   └── skeleton.tsx              # Skeleton, TableSkeleton, CardSkeleton, StatsSkeleton (loading UX)
 │   ├── forms/                        # Form components (future)
 │   ├── tables/                       # Table components (future)
 │   └── layout/                       # Layout components
-│       ├── sidebar.tsx
-│       ├── header.tsx
-│       └── dashboard-layout.tsx
+│       ├── sidebar.tsx               # Collapsible (w-64↔w-16), mobile drawer + overlay, signout, localStorage persistence
+│       ├── header.tsx                # Minimal top bar (hamburger toggle, user chip, signout) — nav removed (sidebar owns nav)
+│       └── dashboard-layout.tsx      # Orchestrates collapsed/mobile state, lg:pl-64/16, passes props to Sidebar/Header
 ├── lib/                              # Core utilities
 │   ├── prisma.ts                     # Prisma client singleton (globalThis guard)
 │   ├── auth.ts                       # Auth utilities (bcryptjs + jsonwebtoken, Node runtime; Next 15: async cookies() — setAuthCookie/clearAuthCookie are async)
@@ -231,3 +248,12 @@ src/
 - ESLint/Glob: Upgraded `eslint` `8.56.0` → `9.31.0`, migrated `.eslintrc.js` → `eslint.config.mjs` (flat config, FlatCompat). Glob vuln (`glob@7`/`glob@10` deprecated) removed via eslint 9 tree (`@eslint/config-array`). `next lint` is deprecated in Next 15 — future migration is `eslint .` via `npx @next/codemod next-lint-to-eslint-cli`.
 - Exhaustive-deps: Wrapped `fetchApprovals`/`fetchAssets`/`fetchLogs`/`fetchUsers` in `React.useCallback` with explicit deps; `useEffect` now depends on callback — `✔ No ESLint warnings or errors`.
 - Next 15 async cookies: `src/lib/auth.ts:setAuthCookie`/`clearAuthCookie` made `async` + `await cookies()`; call sites (`/api/auth/login`, `/register`, `/logout`) now `await` — fixes `Property 'set' does not exist on type 'Promise<ReadonlyRequestCookies>'` type error introduced by Next 15.
+
+## Drift Fixed 2026-09-23 — Full UX/Routing Remediation
+
+- 404s: Created missing pages that caused `Failed to load resource: 404` for RSC fetches: `assets/new`, `assets/[id]/edit|assign|return`, `users/new`, `users/[id]`, `admin/backup|import|accessories/new`, `auth/logout` (POST+GET `/api/auth/logout` + `/auth/logout` page). Added API aliases: `dashboard/stats`, `accessories`(+[id]), `admin/configs|import|backup`. Verified `next build` 32 routes (previously 21) — all 404s resolved.
+- Layout: Removed navbar duplication (Header nav list removed — Sidebar owns nav). Sidebar now collapsible (w-64↔w-16, localStorage `sidebar-collapsed`), mobile drawer with overlay + hamburger in Header toggles `mobileOpen`, close-on-route-change. Signout button in Sidebar (and Header fallback) — POST `/api/auth/logout` then `router.push('/auth/login')`.
+- Loading UX: Added `src/components/ui/skeleton.tsx` (Skeleton, TableSkeleton, CardSkeleton, StatsSkeleton). All list pages (`assets`, `users`, `approvals`, `audit-logs`, `dashboard`, `assets/[id]`) show skeletons while `loading` vs immediate empty state; `emptyMessage` clarified (e.g., “No assets found — seed data may be loading or filters exclude results”).
+- Dashboard real data: Replaced mock stats/recentAssets/pendingApprovals with `fetch('/api/dashboard/stats')` — aggregates `totalAssets/assigned/available/pendingApprovals/maintenance/retired/totalUsers` + `recentAssets` (5, with assignee) + `pendingApprovals` (5) + `byCategory` groupBy; `formatNumber` for display; error + loading skeletons.
+- Admin editable: `admin/page.tsx` now fetches/edits `AccessoryType` via `/api/accessories` (CRUD + inline edit modal, delete) and `SystemConfig` via `/api/admin/configs` (PATCH upsert for `high_value_threshold`, `approval_reminder_days`, `email_notifications_enabled`). Import (`admin/import` → CSV/JSON parse client-side → POST `/api/admin/import` bulk create) and Backup (`admin/backup` → GET `/api/admin/backup` → download JSON) are fully wired.
+- Build: `npm run build` passes — `✓ Compiled successfully`, 32 routes, `ƒ Middleware 39 kB`, zero Edge warnings.

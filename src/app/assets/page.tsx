@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
 import { formatDate } from '@/lib/utils'
 import { getAssetStatusLabel } from '@/lib/utils'
+import { TableSkeleton, Skeleton } from '@/components/ui/skeleton'
 
 interface Asset {
   id: string
@@ -164,18 +165,22 @@ export default function AssetsPage() {
         {/* Assets Table */}
         <Card>
           <CardContent className="p-0">
-            <DataTable
-              columns={columns}
-              data={assets}
-              keyAccessor={(row) => row.id}
-              emptyMessage="No assets found"
-              pagination={{
-                page,
-                pageSize,
-                total,
-                onPageChange: setPage,
-              }}
-            />
+            {loading ? (
+              <TableSkeleton rows={5} cols={7} />
+            ) : (
+              <DataTable
+                columns={columns}
+                data={assets}
+                keyAccessor={(row) => row.id}
+                emptyMessage="No assets found — seed data may be loading or filters exclude results"
+                pagination={{
+                  page,
+                  pageSize,
+                  total,
+                  onPageChange: setPage,
+                }}
+              />
+            )}
           </CardContent>
         </Card>
       </div>
