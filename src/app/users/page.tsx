@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { DashboardLayout } from '@/components/layout/dashboard-layout'
 import { DataTable, Column } from '@/components/ui/table'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -28,18 +29,55 @@ interface User {
   _count: { assignedAssets: number }
 }
 
-export default function UsersPage() {
+function UsersPageContent() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
   const [users, setUsers] = React.useState<User[]>([])
   const [loading, setLoading] = React.useState(true)
   const [total, setTotal] = React.useState(0)
-  const [page, setPage] = React.useState(1)
-  const [pageSize, setPageSize] = React.useState(25)
+  const [page, setPage] = React.useState(() => parseInt(searchParams.get('page') || '1'))
+  const [pageSize, setPageSize] = React.useState(() => parseInt(searchParams.get('pageSize') || '25'))
   const [filters, setFilters] = React.useState({
-    department: '',
-    role: '',
-    search: '',
+    department: searchParams.get('department') || '',
+    role: searchParams.get('role') || '',
+    search: searchParams.get('search') || '',
     page: 1,
   })
+  const [searchInput, setSearchInput] = React.useState(searchParams.get('search') || '')
+
+  const updateURL = React.useCallback((next: Record<string, string>) => {
+    const params = new URLSearchParams(searchParams.toString())
+    Object.entries(next).forEach(([k, v]) => {
+      if (v) params.set(k, v)
+      else params.delete(k)
+    })
+    router.replace(`${pathname}?${params.toString()}`)
+  }, [searchParams, router, pathname])
+
+  React.useEffect(() => {
+    const d = searchParams.get('department') || ''
+    const r = searchParams.get('role') || ''
+    const q = searchParams.get('search') || ''
+    const p = parseInt(searchParams.get('page') || '1')
+    const ps = parseInt(searchParams.get('pageSize') || '25')
+    setFilters((prev) => (prev.department === d && prev.role === r && prev.search === q ? prev : { department: d, role: r, search: q, page: 1 }))
+    setSearchInput(q)
+    if (p !== page) setPage(p)
+    if (ps !== pageSize) setPageSize(ps)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
+
+  React.useEffect(() => {
+    const id = setTimeout(() => {
+      if (searchInput !== filters.search) {
+        setFilters((prev) => ({ ...prev, search: searchInput }))
+        updateURL({ search: searchInput, department: filters.department, role: filters.role, page: '1' })
+        setPage(1)
+      }
+    }, 400)
+    return () => clearTimeout(id)
+  }, [searchInput, filters.search, filters.department, filters.role, updateURL])
   
   const fetchUsers = React.useCallback(async () => {
     setLoading(true)
@@ -137,8 +175,8 @@ export default function UsersPage() {
             <div className="flex flex-wrap gap-4">
               <Input
                 placeholder="Search users..."
-                value={filters.search}
-                onChange={(e) => setFilters({ ...filters, search: e.target.value, page: 1 })}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
                 className="max-w-xs"
               />
               <Select
@@ -154,7 +192,7 @@ export default function UsersPage() {
                   { value: 'OTHER', label: 'Other' },
                 ]}
                 value={filters.department}
-                onChange={(e) => setFilters({ ...filters, department: e.target.value, page: 1 })}
+                onChange={(e) => { setFilters((p) => ({ ...p, department: e.target.value })); updateURL({ department: e.target.value, page: '1' }); setPage(1) }}
               />
               <Select
                 options={[
@@ -170,7 +208,7 @@ export default function UsersPage() {
                   { value: 'EMPLOYEE', label: 'Employee' },
                 ]}
                 value={filters.role}
-                onChange={(e) => setFilters({ ...filters, role: e.target.value, page: 1 })}
+                onChange={(e) => { setFilters((p) => ({ ...p, role: e.target.value })); updateURL({ role: e.target.value, page: '1' }); setPage(1) }}
               />
             </div>
           </CardContent>
@@ -191,7 +229,7 @@ export default function UsersPage() {
                   page,
                   pageSize,
                   total,
-                  onPageChange: setPage,
+                  onPageChange: (p) => { setPage(p); updateURL({ page: String(p) }) },
                 }}
               />
             )}
@@ -199,5 +237,13 @@ export default function UsersPage() {
         </Card>
       </div>
     </DashboardLayout>
+  )
+}
+
+export default function UsersPage() {
+  return (
+    <React.Suspense fallback={<DashboardLayout><div className="p-8"><TableSkeleton rows={5} cols={6} /></div></DashboardLayout>}>
+      <UsersPageContent />
+    </React.Suspense>
   )
 }

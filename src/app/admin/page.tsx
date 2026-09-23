@@ -14,17 +14,28 @@ import { Skeleton } from '@/components/ui/skeleton'
 
 interface AccessoryType { id: string; name: string; code: string; description: string | null; isActive: boolean }
 interface SystemConfig { id: string; key: string; value: unknown; category: string; description: string | null }
+interface DepartmentItem { id: string; key: string; code: string; name: string; description: string | null; isActive: boolean; source: 'config'|'enum' }
+interface RoleItem { id: string; key: string; code: string; label: string; department: string; canApprove: string; canManageAssets: string; canManageUsers: string; description: string | null; isActive: boolean; source: 'config'|'enum' }
 
 export default function AdminPage() {
   const [accessoryTypes, setAccessoryTypes] = React.useState<AccessoryType[]>([])
   const [configs, setConfigs] = React.useState<SystemConfig[]>([])
+  const [departments, setDepartments] = React.useState<DepartmentItem[]>([])
+  const [roles, setRoles] = React.useState<RoleItem[]>([])
   const [loadingAcc, setLoadingAcc] = React.useState(true)
   const [loadingCfg, setLoadingCfg] = React.useState(true)
+  const [loadingDept, setLoadingDept] = React.useState(true)
+  const [loadingRoles, setLoadingRoles] = React.useState(true)
   const [editingAcc, setEditingAcc] = React.useState<AccessoryType | null>(null)
   const [accForm, setAccForm] = React.useState({ name: '', code: '', description: '', isActive: 'true' })
   const [cfgForm, setCfgForm] = React.useState({ high_value_threshold: '100000', approval_reminder_days: '3', email_notifications_enabled: 'true' })
+  const [deptForm, setDeptForm] = React.useState({ code: '', name: '', description: '', isActive: 'true' })
+  const [editingDeptKey, setEditingDeptKey] = React.useState<string | null>(null)
+  const [roleForm, setRoleForm] = React.useState({ code: '', label: '', department: 'OTHER', canApprove: '', canManageAssets: '', canManageUsers: '', description: '', isActive: 'true' })
+  const [editingRoleKey, setEditingRoleKey] = React.useState<string | null>(null)
   const [saving, setSaving] = React.useState(false)
   const [msg, setMsg] = React.useState('')
+  const [previewRole, setPreviewRole] = React.useState<string>('')
 
   const fetchAccessories = React.useCallback(async () => {
     setLoadingAcc(true)
@@ -54,7 +65,42 @@ export default function AdminPage() {
     } catch {} finally { setLoadingCfg(false) }
   }, [])
 
-  React.useEffect(() => { fetchAccessories(); fetchConfigs() }, [fetchAccessories, fetchConfigs])
+  const fetchDepartments = React.useCallback(async () => {
+    setLoadingDept(true)
+    try {
+      const res = await fetch('/api/admin/departments')
+      const data = await res.json()
+      setDepartments(data.departments || [])
+    } catch {} finally { setLoadingDept(false) }
+  }, [])
+  const fetchRoles = React.useCallback(async () => {
+    setLoadingRoles(true)
+    try {
+      const res = await fetch('/api/admin/roles')
+      const data = await res.json()
+      setRoles(data.roles || [])
+    } catch {} finally { setLoadingRoles(false) }
+  }, [])
+
+  React.useEffect(() => { fetchAccessories(); fetchConfigs(); fetchDepartments(); fetchRoles() }, [fetchAccessories, fetchConfigs, fetchDepartments, fetchRoles])
+
+  // preview role cookie
+  React.useEffect(() => {
+    const match = document.cookie.match(/preview-role=([^;]+)/)
+    if (match) setPreviewRole(decodeURIComponent(match[1]))
+  }, [])
+
+  const handleSetPreview = async (role: string) => {
+    if (!role) {
+      await fetch('/api/admin/preview', { method: 'DELETE' })
+      setPreviewRole('')
+      setMsg('Exited preview mode')
+    } else {
+      await fetch('/api/admin/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role }) })
+      setPreviewRole(role)
+      setMsg(`Previewing as ${role} — reload to see filtered navigation`)
+    }
+  }
 
   const handleEditAcc = (acc: AccessoryType) => {
     setEditingAcc(acc)
@@ -95,6 +141,69 @@ export default function AdminPage() {
     } catch { setMsg('Failed to save settings') } finally { setSaving(false) }
   }
 
+  // Department CRUD
+  const handleCreateDept = async () => {
+    if (!deptForm.code || !deptForm.name) { setMsg('Code and name required'); return }
+    setSaving(true)
+    try {
+      const res = await fetch('/api/admin/departments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: deptForm.code, name: deptForm.name, description: deptForm.description, isActive: deptForm.isActive === 'true' }) })
+      if (!res.ok) throw new Error((await res.json()).error || 'Failed')
+      setDeptForm({ code: '', name: '', description: '', isActive: 'true' })
+      fetchDepartments()
+      setMsg('Department created')
+    } catch (e) { setMsg(e instanceof Error ? e.message : 'Failed') } finally { setSaving(false) }
+  }
+  const handleEditDept = (d: DepartmentItem) => {
+    setEditingDeptKey(d.key)
+    setDeptForm({ code: d.code, name: d.name, description: d.description || '', isActive: String(d.isActive) })
+  }
+  const handleUpdateDept = async () => {
+    if (!editingDeptKey) return
+    setSaving(true)
+    try {
+      const res = await fetch('/api/admin/departments', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: editingDeptKey, name: deptForm.name, description: deptForm.description, isActive: deptForm.isActive === 'true', code: deptForm.code }) })
+      if (!res.ok) throw new Error((await res.json()).error || 'Failed')
+      setEditingDeptKey(null); setDeptForm({ code: '', name: '', description: '', isActive: 'true' }); fetchDepartments(); setMsg('Department updated')
+    } catch (e) { setMsg(e instanceof Error ? e.message : 'Failed') } finally { setSaving(false) }
+  }
+  const handleDeleteDept = async (key: string) => {
+    if (!confirm('Delete department?')) return
+    await fetch(`/api/admin/departments?key=${encodeURIComponent(key)}`, { method: 'DELETE' })
+    fetchDepartments()
+  }
+
+  // Role CRUD
+  const handleCreateRole = async () => {
+    if (!roleForm.code || !roleForm.label) { setMsg('Code and label required'); return }
+    setSaving(true)
+    try {
+      const res = await fetch('/api/admin/roles', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: roleForm.code, label: roleForm.label, department: roleForm.department, canApprove: roleForm.canApprove, canManageAssets: roleForm.canManageAssets, canManageUsers: roleForm.canManageUsers, description: roleForm.description, isActive: roleForm.isActive === 'true' }) })
+      if (!res.ok) throw new Error((await res.json()).error || 'Failed')
+      setRoleForm({ code: '', label: '', department: 'OTHER', canApprove: '', canManageAssets: '', canManageUsers: '', description: '', isActive: 'true' })
+      fetchRoles(); setMsg('Role created')
+    } catch (e) { setMsg(e instanceof Error ? e.message : 'Failed') } finally { setSaving(false) }
+  }
+  const handleEditRole = (r: RoleItem) => {
+    setEditingRoleKey(r.key)
+    setRoleForm({ code: r.code, label: r.label, department: r.department, canApprove: r.canApprove, canManageAssets: r.canManageAssets, canManageUsers: r.canManageUsers, description: r.description || '', isActive: String(r.isActive) })
+  }
+  const handleUpdateRole = async () => {
+    if (!editingRoleKey) return
+    setSaving(true)
+    try {
+      const res = await fetch('/api/admin/roles', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: editingRoleKey, label: roleForm.label, department: roleForm.department, canApprove: roleForm.canApprove, canManageAssets: roleForm.canManageAssets, canManageUsers: roleForm.canManageUsers, description: roleForm.description, isActive: roleForm.isActive === 'true', code: roleForm.code }) })
+      if (!res.ok) throw new Error((await res.json()).error || 'Failed')
+      setEditingRoleKey(null); setRoleForm({ code: '', label: '', department: 'OTHER', canApprove: '', canManageAssets: '', canManageUsers: '', description: '', isActive: 'true' }); fetchRoles(); setMsg('Role updated')
+    } catch (e) { setMsg(e instanceof Error ? e.message : 'Failed') } finally { setSaving(false) }
+  }
+  const handleDeleteRole = async (key: string) => {
+    if (!confirm('Delete role? System roles cannot be deleted.')) return
+    const res = await fetch(`/api/admin/roles?key=${encodeURIComponent(key)}`, { method: 'DELETE' })
+    const data = await res.json().catch(()=>({}))
+    if (!res.ok) setMsg(data.error || 'Delete failed')
+    else fetchRoles()
+  }
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -110,6 +219,7 @@ export default function AdminPage() {
             <TabsTrigger value="roles">Roles & Permissions</TabsTrigger>
             <TabsTrigger value="accessories">Accessory Types</TabsTrigger>
             <TabsTrigger value="settings">Settings</TabsTrigger>
+            <TabsTrigger value="preview">Preview As</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
@@ -132,47 +242,78 @@ export default function AdminPage() {
           </TabsContent>
 
           <TabsContent value="departments" className="space-y-4">
+            {msg && <div className="p-3 bg-blue-50 text-blue-700 rounded text-sm">{msg}</div>}
             <Card>
-              <CardHeader><CardTitle>Departments</CardTitle><p className="text-sm text-gray-500">Manage department heads and officers via Users page</p></CardHeader>
-              <CardContent>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {['HR', 'IT', 'COMPLIANCE', 'FINANCE', 'OPERATIONS', 'MARKETING', 'SALES'].map((dept) => (
-                    <div key={dept} className="p-4 border rounded-lg">
-                      <h3 className="font-medium">{dept}</h3>
-                      <p className="text-sm text-gray-500 mt-1">Manage via Users → filter by {dept}</p>
-                      <Button variant="ghost" size="sm" className="mt-2" asChild><Link href={`/users?department=${dept}`}>View Users</Link></Button>
+              <CardHeader className="flex flex-row items-center justify-between"><CardTitle>Departments — CRUD</CardTitle><Badge variant="info">{departments.length} total</Badge></CardHeader>
+              <CardContent className="space-y-4">
+                {loadingDept ? <Skeleton className="h-48" /> : (
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead><tr className="border-b"><th className="text-left p-3">Code</th><th className="text-left p-3">Name</th><th className="text-left p-3">Description</th><th className="text-left p-3">Status</th><th className="text-left p-3">Source</th><th className="text-left p-3">Actions</th></tr></thead>
+                        <tbody className="divide-y">
+                          {departments.map((d) => (
+                            <tr key={d.key}><td className="p-3 font-mono">{d.code}</td><td className="p-3 font-medium">{d.name}</td><td className="p-3 text-gray-500">{d.description || '-'}</td><td className="p-3"><Badge variant={d.isActive ? 'success' : 'danger'}>{d.isActive ? 'Active' : 'Inactive'}</Badge></td><td className="p-3"><Badge variant="gray">{d.source}</Badge></td><td className="p-3 flex gap-1"><Button variant="ghost" size="sm" onClick={() => handleEditDept(d)}>Edit</Button><Button variant="ghost" size="sm" className="text-red-600" onClick={() => handleDeleteDept(d.key)}>Delete</Button><Button variant="ghost" size="sm" asChild><Link href={`/users?department=${d.code}`}>Users</Link></Button></td></tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      {departments.length === 0 && <p className="text-center text-gray-500 py-4">No departments</p>}
                     </div>
-                  ))}
-                </div>
+                    <div className="border-t pt-4">
+                      <h4 className="font-medium mb-3">{editingDeptKey ? `Edit ${editingDeptKey}` : 'Add Department'}</h4>
+                      <div className="grid md:grid-cols-4 gap-3">
+                        <Input label="Code *" value={deptForm.code} onChange={(e) => setDeptForm((p) => ({ ...p, code: e.target.value }))} placeholder="e.g. LEGAL" disabled={!!editingDeptKey && editingDeptKey.startsWith('dept_')} />
+                        <Input label="Name *" value={deptForm.name} onChange={(e) => setDeptForm((p) => ({ ...p, name: e.target.value }))} placeholder="Legal" />
+                        <Input label="Description" value={deptForm.description} onChange={(e) => setDeptForm((p) => ({ ...p, description: e.target.value }))} placeholder="Optional" />
+                        <Select label="Active" value={deptForm.isActive} onChange={(e) => setDeptForm((p) => ({ ...p, isActive: e.target.value }))} options={[{ value: 'true', label: 'Active' }, { value: 'false', label: 'Inactive' }]} />
+                      </div>
+                      <div className="flex gap-2 mt-3">
+                        {editingDeptKey ? (<><Button onClick={handleUpdateDept} disabled={saving}>{saving ? 'Saving...' : 'Update'}</Button><Button variant="outline" onClick={() => { setEditingDeptKey(null); setDeptForm({ code: '', name: '', description: '', isActive: 'true' }) }}>Cancel</Button></>) : (<Button onClick={handleCreateDept} disabled={saving}>{saving ? 'Saving...' : 'Create Department'}</Button>)}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2">Non-breaking: enum departments remain; custom departments stored in SystemConfig. Users select via dropdown.</p>
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
 
           <TabsContent value="roles" className="space-y-4">
+            {msg && <div className="p-3 bg-blue-50 text-blue-700 rounded text-sm">{msg}</div>}
             <Card>
-              <CardHeader><CardTitle>Role Definitions</CardTitle></CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead><tr className="border-b"><th className="text-left p-3">Role</th><th className="text-left p-3">Department</th><th className="text-left p-3">Can Approve</th><th className="text-left p-3">Can Manage Assets</th><th className="text-left p-3">Can Manage Users</th></tr></thead>
-                    <tbody className="divide-y">
-                      {[
-                        { role: 'Super Admin', dept: 'All', approve: 'All', assets: 'All', users: 'All' },
-                        { role: 'Admin', dept: 'All', approve: 'All', assets: 'All', users: 'All' },
-                        { role: 'HR Head', dept: 'HR', approve: 'Asset Requests, Transfers', assets: 'View', users: 'HR Dept' },
-                        { role: 'HR Officer', dept: 'HR', approve: 'Asset Requests', assets: 'View', users: 'HR Dept' },
-                        { role: 'IT Head', dept: 'IT', approve: 'Asset Requests, Transfers, Accessories', assets: 'All', users: 'IT Dept' },
-                        { role: 'IT Officer', dept: 'IT', approve: 'Accessories', assets: 'All', users: 'IT Dept' },
-                        { role: 'Compliance Head', dept: 'Compliance', approve: 'High-value Assets', assets: 'View', users: 'Compliance Dept' },
-                        { role: 'Compliance Officer', dept: 'Compliance', approve: 'View', assets: 'View', users: 'Compliance Dept' },
-                        { role: 'Employee', dept: 'Assigned', approve: 'Own Returns', assets: 'Own Only', users: 'Self' },
-                      ].map((r) => (
-                        <tr key={r.role}><td className="p-3 font-medium">{r.role}</td><td className="p-3">{r.dept}</td><td className="p-3">{r.approve}</td><td className="p-3">{r.assets}</td><td className="p-3">{r.users}</td></tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <p className="text-sm text-gray-500 mt-3">Roles are assigned when inviting/editing users.</p>
+              <CardHeader className="flex flex-row items-center justify-between"><CardTitle>Roles & Permissions — CRUD</CardTitle><Badge variant="info">{roles.length} total</Badge></CardHeader>
+              <CardContent className="space-y-4">
+                {loadingRoles ? <Skeleton className="h-48" /> : (
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead><tr className="border-b"><th className="text-left p-3">Code</th><th className="text-left p-3">Label</th><th className="text-left p-3">Department</th><th className="text-left p-3">Can Approve</th><th className="text-left p-3">Can Manage Assets</th><th className="text-left p-3">Can Manage Users</th><th className="text-left p-3">Actions</th></tr></thead>
+                        <tbody className="divide-y">
+                          {roles.map((r) => (
+                            <tr key={r.key}><td className="p-3 font-mono">{r.code}</td><td className="p-3 font-medium">{r.label}</td><td className="p-3">{r.department}</td><td className="p-3">{r.canApprove || '-'}</td><td className="p-3">{r.canManageAssets || '-'}</td><td className="p-3">{r.canManageUsers || '-'}</td><td className="p-3 flex gap-1"><Button variant="ghost" size="sm" onClick={() => handleEditRole(r)}>Edit</Button><Button variant="ghost" size="sm" className="text-red-600" onClick={() => handleDeleteRole(r.key)}>Delete</Button></td></tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="border-t pt-4">
+                      <h4 className="font-medium mb-3">{editingRoleKey ? `Edit ${editingRoleKey}` : 'Add / Override Role'}</h4>
+                      <div className="grid md:grid-cols-3 gap-3">
+                        <Input label="Code *" value={roleForm.code} onChange={(e) => setRoleForm((p) => ({ ...p, code: e.target.value }))} placeholder="e.g. LEGAL_HEAD" disabled={!!editingRoleKey} />
+                        <Input label="Label *" value={roleForm.label} onChange={(e) => setRoleForm((p) => ({ ...p, label: e.target.value }))} placeholder="Legal Head" />
+                        <Select label="Department" value={roleForm.department} onChange={(e) => setRoleForm((p) => ({ ...p, department: e.target.value }))} options={[{ value: 'HR', label: 'HR' }, { value: 'IT', label: 'IT' }, { value: 'COMPLIANCE', label: 'Compliance' }, { value: 'FINANCE', label: 'Finance' }, { value: 'OPERATIONS', label: 'Operations' }, { value: 'MARKETING', label: 'Marketing' }, { value: 'SALES', label: 'Sales' }, { value: 'OTHER', label: 'Other' }, { value: 'All', label: 'All' }, { value: 'Assigned', label: 'Assigned' }]} />
+                        <Input label="Can Approve" value={roleForm.canApprove} onChange={(e) => setRoleForm((p) => ({ ...p, canApprove: e.target.value }))} placeholder="Describe approval scope" />
+                        <Input label="Can Manage Assets" value={roleForm.canManageAssets} onChange={(e) => setRoleForm((p) => ({ ...p, canManageAssets: e.target.value }))} />
+                        <Input label="Can Manage Users" value={roleForm.canManageUsers} onChange={(e) => setRoleForm((p) => ({ ...p, canManageUsers: e.target.value }))} />
+                        <Input label="Description" value={roleForm.description} onChange={(e) => setRoleForm((p) => ({ ...p, description: e.target.value }))} />
+                        <Select label="Active" value={roleForm.isActive} onChange={(e) => setRoleForm((p) => ({ ...p, isActive: e.target.value }))} options={[{ value: 'true', label: 'Active' }, { value: 'false', label: 'Inactive' }]} />
+                      </div>
+                      <div className="flex gap-2 mt-3">
+                        {editingRoleKey ? (<><Button onClick={handleUpdateRole} disabled={saving}>{saving ? 'Saving...' : 'Update'}</Button><Button variant="outline" onClick={() => { setEditingRoleKey(null); setRoleForm({ code: '', label: '', department: 'OTHER', canApprove: '', canManageAssets: '', canManageUsers: '', description: '', isActive: 'true' }) }}>Cancel</Button></>) : (<Button onClick={handleCreateRole} disabled={saving}>{saving ? 'Saving...' : 'Create Role'}</Button>)}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2">Non-breaking: editing enum roles creates an override config; system roles cannot be deleted. Custom roles can extend permissions.</p>
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -255,6 +396,24 @@ export default function AdminPage() {
                     </div>
                   </>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+          <TabsContent value="preview" className="space-y-4">
+            <Card>
+              <CardHeader><CardTitle>Preview as Role (Superadmin)</CardTitle><p className="text-sm text-gray-500">Switch UI view without signing out. Data filtering respects preview where supported.</p></CardHeader>
+              <CardContent className="space-y-4">
+                {msg && <div className="p-3 bg-yellow-50 text-yellow-700 rounded text-sm">{msg}</div>}
+                {previewRole && <div className="p-3 bg-purple-50 text-purple-700 rounded text-sm">Currently previewing as <strong>{previewRole}</strong>. APIs include preview header when cookie set.</div>}
+                <div className="flex flex-wrap gap-3">
+                  <Select label="Select role to preview" value={previewRole} onChange={(e) => handleSetPreview(e.target.value)} options={[{ value: '', label: '— Exit preview (real role) —' }, { value: 'SUPERADMIN', label: 'Super Admin' }, { value: 'ADMIN', label: 'Admin' }, { value: 'HR_HEAD', label: 'HR Head' }, { value: 'HR_OFFICER', label: 'HR Officer' }, { value: 'IT_HEAD', label: 'IT Head' }, { value: 'IT_OFFICER', label: 'IT Officer' }, { value: 'COMPLIANCE_HEAD', label: 'Compliance Head' }, { value: 'COMPLIANCE_OFFICER', label: 'Compliance Officer' }, { value: 'EMPLOYEE', label: 'Employee' }]} />
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => handleSetPreview('')}>Exit Preview</Button>
+                  <Button variant="outline" asChild><Link href="/dashboard">Go to Dashboard</Link></Button>
+                  <Button variant="outline" asChild><Link href="/assets">View Assets</Link></Button>
+                </div>
+                <p className="text-xs text-gray-500">Preview uses a <code>preview-role</code> cookie; middleware overrides role for SUPERADMIN users. Audit logs record preview sessions separately if needed.</p>
               </CardContent>
             </Card>
           </TabsContent>

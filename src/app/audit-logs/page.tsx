@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { DashboardLayout } from '@/components/layout/dashboard-layout'
 import { DataTable, Column } from '@/components/ui/table'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -23,18 +24,35 @@ interface AuditLog {
   afterState: Record<string, unknown> | null
 }
 
-export default function AuditLogsPage() {
+function AuditLogsPageContent() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
   const [logs, setLogs] = React.useState<AuditLog[]>([])
   const [loading, setLoading] = React.useState(true)
   const [total, setTotal] = React.useState(0)
-  const [page, setPage] = React.useState(1)
-  const [pageSize, setPageSize] = React.useState(50)
+  const [page, setPage] = React.useState(() => parseInt(searchParams.get('page') || '1'))
+  const [pageSize, setPageSize] = React.useState(() => parseInt(searchParams.get('pageSize') || '50'))
   const [filters, setFilters] = React.useState({
-    entityType: '',
-    action: '',
-    actorId: '',
+    entityType: searchParams.get('entityType') || '',
+    action: searchParams.get('action') || '',
+    actorId: searchParams.get('actorId') || '',
     page: 1,
   })
+  const updateURL = React.useCallback((next: Record<string, string>) => {
+    const params = new URLSearchParams(searchParams.toString())
+    Object.entries(next).forEach(([k, v]) => { if (v) params.set(k, v); else params.delete(k) })
+    router.replace(`${pathname}?${params.toString()}`)
+  }, [searchParams, router, pathname])
+  React.useEffect(() => {
+    const et = searchParams.get('entityType') || ''
+    const ac = searchParams.get('action') || ''
+    const aid = searchParams.get('actorId') || ''
+    const p = parseInt(searchParams.get('page') || '1')
+    setFilters((prev) => (prev.entityType === et && prev.action === ac && prev.actorId === aid ? prev : { entityType: et, action: ac, actorId: aid, page: 1 }))
+    if (p !== page) setPage(p)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
   
   const fetchLogs = React.useCallback(async () => {
     setLoading(true)
@@ -116,7 +134,7 @@ export default function AuditLogsPage() {
                   { value: 'AssetTransfer', label: 'Asset Transfer' },
                 ]}
                 value={filters.entityType}
-                onChange={(e) => setFilters({ ...filters, entityType: e.target.value, page: 1 })}
+                onChange={(e) => { setFilters((p) => ({ ...p, entityType: e.target.value })); updateURL({ entityType: e.target.value, page: '1' }); setPage(1) }}
               />
               <Select
                 options={[
@@ -135,12 +153,12 @@ export default function AuditLogsPage() {
                   { value: 'RETIRE', label: 'Retire' },
                 ]}
                 value={filters.action}
-                onChange={(e) => setFilters({ ...filters, action: e.target.value, page: 1 })}
+                onChange={(e) => { setFilters((p) => ({ ...p, action: e.target.value })); updateURL({ action: e.target.value, page: '1' }); setPage(1) }}
               />
               <Input
                 placeholder="Actor ID..."
                 value={filters.actorId}
-                onChange={(e) => setFilters({ ...filters, actorId: e.target.value, page: 1 })}
+                onChange={(e) => { setFilters((p) => ({ ...p, actorId: e.target.value })); updateURL({ actorId: e.target.value, page: '1' }); setPage(1) }}
                 className="max-w-xs"
               />
             </div>
@@ -162,7 +180,7 @@ export default function AuditLogsPage() {
                   page,
                   pageSize,
                   total,
-                  onPageChange: setPage,
+                  onPageChange: (p) => { setPage(p); updateURL({ page: String(p) }) },
                 }}
               />
             )}
@@ -170,5 +188,13 @@ export default function AuditLogsPage() {
         </Card>
       </div>
     </DashboardLayout>
+  )
+}
+
+export default function AuditLogsPage() {
+  return (
+    <React.Suspense fallback={<DashboardLayout><div className="p-8"><TableSkeleton rows={8} cols={5} /></div></DashboardLayout>}>
+      <AuditLogsPageContent />
+    </React.Suspense>
   )
 }

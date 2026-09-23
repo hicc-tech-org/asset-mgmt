@@ -186,6 +186,30 @@
 
 ---
 
+## 2026-09-23 — Query Params, Reassignment, Non-Breaking Extensibility, Preview
+
+**Lesson**: Filters must be URL-synced from day one; extensibility should reuse existing tables (SystemConfig) to stay non-breaking; preview needs both Edge and Client coordination.
+
+**Context**: Directive required `?department=...` in location/navbar to filter, admin to edit assignment via Selects (audit), departments/roles/permissions CRUD without breaking enums, and SUPERADMIN preview-as-role without sign-out. Previous pages used isolated React state, assignment endpoint blocked transfer, admin tabs were static.
+
+**What Worked**:
+- Wrapping list pages in `Suspense` + `useSearchParams` + `router.replace` with debounced search is minimal, additive, and makes every shared link (e.g., `/users?department=HR` from admin cards) work without breaking existing pagination/search.
+- Reusing `SystemConfig` (`category=department|role`) for Departments/Roles CRUD merges enum fallback + config override — no Prisma migration, audit-logged, enum delete blocked, enum edit creates override. Non-breaking guarantee preserved.
+- Extending `POST /api/assets/assign` to allow `isReassignment` (create `AssetTransfer`, audit TRANSFER) and `PATCH /api/assets/[id]` to detect assignment delta avoids a new endpoint; `assets/[id]/edit` Selects drive the same audit path.
+- Preview as: `preview-role` cookie (SUPERADMIN-only API) + Edge `middleware` role override (`x-user-role`) + `Sidebar` nav filter (`baseNavigation` roles array) + purple banner + `admin` Preview tab gives full “see as other role” without auth bypass. Both server (data filtering) and client (nav visibility) respect preview.
+
+**What Could Improve**:
+- Should have URL-synced filters in initial implementation — would have avoided later retrofit and Suspense wrapping for all 4 pages.
+- Departments/Roles via SystemConfig requires JSON parsing; future typed `Department`/`Role` Prisma models would give stronger validation — evaluate migration when extensibility stabilizes.
+- Preview cookie is client-readable (`httpOnly:false`) for banner; consider `httpOnly:true` + server-rendered banner via middleware header if stronger isolation needed.
+
+**Action Items**:
+- [ ] Add CI smoke test: fetch `/users?department=HR` etc. returns filtered data (200)
+- [ ] Add lint rule: new roles must be added to both `ENUM_ROLES` + `SystemConfig` seed if enum changes
+- [ ] Document `SystemConfig` categories (`department`, `role`, `approval`, `notification`) in `system-architecture.md` Configuration Points
+
+---
+
 ## Future Lessons
 
 *Add new lessons here as they are learned*

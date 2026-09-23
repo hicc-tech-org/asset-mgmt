@@ -2,7 +2,7 @@
 
 > **Metadata**
 > - last-updated-by: update-ai-system
-> - last-verified-against-code: 2026-09-16
+> - last-verified-against-code: 2026-09-23
 > - staleness-policy: append-only, never remove entries
 
 > **Overview:** Chronological record of significant architectural decisions and changes.
@@ -96,6 +96,28 @@
 - Next 15 async cookies: all `next/headers:cookies()` call sites must `await` (Node runtime). Lint rule: no sync `cookies().set/delete/get` in route handlers.
 - ESLint flat config: `eslint.config.mjs` is source of truth via `FlatCompat`; `next lint` is deprecated (Next 15) — future `eslint .` migration via codemod.
 - `react-hooks/exhaustive-deps`: fetchers that depend on `page/filters` must be `useCallback` to satisfy deps without infinite loops.
+
+---
+
+## 2026-09-23 — Query Sync, Reassignment, Departments/Roles CRUD, Preview (Sprint 3.1)
+
+**Decision**: Sync filters to URL, allow admin reassignment via Selects with audit, make departments/roles extensible without schema migration, add SUPERADMIN preview-as-role via Edge + Client coordination.
+
+**Context**: User directive: (1) `?department=...` in location/navbar must filter, (2) admin must edit assignment via Selects (audit), (3) departments/roles/permissions need end-to-end CRUD non-breaking, (4) SUPERADMIN preview as other users without sign-out, (5) execute `update-ai-system.md` at end. Previous `assets/users/approvals/audit-logs` pages held filters only in local React state, assignment endpoint rejected transfer, admin tabs were static, no preview mechanism.
+
+**Alternatives Considered**:
+- New Prisma models `Department` + `Role` with migrations — Rejected: breaking change, requires migration + data backfill for existing enum values; SystemConfig reuse achieves non-breaking extensibility with zero migration.
+- Separate `/api/assets/reassign` endpoint — Rejected: existing `POST /api/assets/assign` already nearest semantic; extending it with `isReassignment` + `AssetTransfer` creation keeps API surface small and audit consistent (TRANSFER vs ASSIGN).
+- Preview via client-only localStorage role mock — Rejected: data filtering would remain real role; Edge middleware override of `x-user-role` (SUPERADMIN-only) ensures server-side filtering matches preview, while Sidebar filters nav for visual parity.
+
+**Outcome**:
+- `assets/users/approvals/audit-logs` pages: `useSearchParams` inside `Suspense` + `useRouter`/`usePathname` + `router.replace` + debounced search; `admin` dept cards now link correctly to filtered `users`.
+- `assets/[id]/edit`: Assignment Selects (users fetch) + expectedReturnDate; submit orchestrates `assign` (TRANSFER + AssetTransfer) or unassign (UNASSIGN) then remaining PATCH; `assign/route.ts` allows reassignment, `PATCH /api/assets/[id]` audits assignment delta.
+- `/api/admin/departments` + `/api/admin/roles` via `SystemConfig` (category + key), GET merges enum + config; POST/PATCH/DELETE audit-logged, enum delete blocked.
+- `POST|DELETE|GET /api/admin/preview` (`preview-role` cookie, SUPERADMIN only); `middleware` overrides `x-user-role` with preview; `Sidebar` `baseNavigation` filtered by preview + banner; `admin` Preview tab.
+
+**Patterns Established**:
+- URL is source of truth for filters (Suspense + searchParams pattern); SystemConfig categories (`department`, `role`) for non-breaking extensibility; preview-role cookie + Edge override pattern for role preview.
 
 ---
 

@@ -3,7 +3,7 @@
 > **Metadata**
 >
 > - last-updated-by: update-ai-system
-> - last-verified-against-code: 2026-09-16
+> - last-verified-against-code: 2026-09-23
 > - installed-ai-system-version: 1.0.0
 > - staleness-policy: re-verify before trusting if project structure has changed
 
@@ -18,7 +18,7 @@
 | Project Name     | Asset Management Platform         |
 | Type             | Web Application                   |
 | Primary Language | TypeScript                        |
-| Frontend         | Next.js 14 (App Router)           |
+| Frontend         | Next.js 15 (App Router)           |
 | Backend          | Next.js API Routes + Prisma       |
 | Database         | PostgreSQL                        |
 | Styling          | Tailwind CSS                      |
@@ -59,4 +59,5 @@ Two catalogs worth knowing exist (read on demand, not up front):
 
 Building the MVP of an Asset Management Platform to replace manual Excel/PDF-based tracking. Core features: asset lifecycle management, accessory tracking with unique IDs, multi-department approval chains (HR, IT, Compliance), comprehensive audit trails, and role-based access control with Superadmin user invitation capabilities.
 
-> **2026-09-16 update:** MVP core complete and Vercel-deployable after build hardening (PR #5): `build` now `prisma generate && next build` + `postinstall` `prisma generate`; Edge middleware migrated to `jose` (async). Open debt: Next.js 14.2.0 CVE upgrade, `exhaustive-deps` lint fixes, eslint/glob upgrades — see `ai-system/system-architecture.md` Discrepancy Report and `ai-system/planning/task-queue.md` Sprint 2.1.
+> **2026-09-16 update:** MVP core complete and Vercel-deployable after build hardening (PR #5): `build` now `prisma generate && next build` + `postinstall` `prisma generate`; Edge middleware migrated to `jose` (async). Follow-up 2026-09-16 upgraded Next 14→15 (CVE), eslint 8→9, fixed exhaustive-deps, handled async cookies.
+> **2026-09-23 update:** Full UX/routing remediation (32 routes, collapsible sidebar, skeletons, real dashboard, admin CRUD) plus current 2026-09-23 session: query-param URL sync (assets/users/approvals/audit-logs), admin assignment edit via Selects + audit TRANSFER/UNASSIGN, non-breaking Departments/Roles CRUD via SystemConfig, SUPERADMIN preview-as-role (Edge + Sidebar filter). Build 35 routes, passing.

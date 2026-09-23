@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { DashboardLayout } from '@/components/layout/dashboard-layout'
 import { DataTable, Column } from '@/components/ui/table'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -28,28 +29,85 @@ interface Asset {
   accessories: Array<{ id: string; name: string; accessoryId: string; status: string }>
 }
 
-export default function AssetsPage() {
+function AssetsPageContent() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
   const [assets, setAssets] = React.useState<Asset[]>([])
   const [loading, setLoading] = React.useState(true)
   const [total, setTotal] = React.useState(0)
-  const [page, setPage] = React.useState(1)
-  const [pageSize, setPageSize] = React.useState(25)
+  const [page, setPage] = React.useState(() => parseInt(searchParams.get('page') || '1'))
+  const [pageSize, setPageSize] = React.useState(() => parseInt(searchParams.get('pageSize') || '25'))
   const [filters, setFilters] = React.useState({
-    status: '',
-    category: '',
-    search: '',
+    status: searchParams.get('status') || '',
+    category: searchParams.get('category') || '',
+    search: searchParams.get('search') || '',
     page: 1,
   })
+  const [searchInput, setSearchInput] = React.useState(searchParams.get('search') || '')
+
+  const updateURL = React.useCallback((next: Record<string, string>) => {
+    const params = new URLSearchParams(searchParams.toString())
+    Object.entries(next).forEach(([k, v]) => {
+      if (v) params.set(k, v)
+      else params.delete(k)
+    })
+    router.replace(`${pathname}?${params.toString()}`)
+  }, [searchParams, router, pathname])
+
+  React.useEffect(() => {
+    const s = searchParams.get('status') || ''
+    const c = searchParams.get('category') || ''
+    const q = searchParams.get('search') || ''
+    const p = parseInt(searchParams.get('page') || '1')
+    const ps = parseInt(searchParams.get('pageSize') || '25')
+    setFilters((prev) => (prev.status === s && prev.category === c && prev.search === q ? prev : { status: s, category: c, search: q, page: 1 }))
+    setSearchInput(q)
+    if (p !== page) setPage(p)
+    if (ps !== pageSize) setPageSize(ps)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
+
+  React.useEffect(() => {
+    const id = setTimeout(() => {
+      if (searchInput !== filters.search) {
+        const nextSearch = searchInput
+        setFilters((prev) => ({ ...prev, search: nextSearch }))
+        updateURL({ search: nextSearch, status: filters.status, category: filters.category, page: '1' })
+        setPage(1)
+      }
+    }, 400)
+    return () => clearTimeout(id)
+  }, [searchInput, filters.search, filters.status, filters.category, updateURL])
   
+  const applyPage = (nextPage: number) => {
+    setPage(nextPage)
+    updateURL({ page: String(nextPage) })
+  }
+
+  const handleStatusChange = (v: string) => {
+    setFilters((p) => ({ ...p, status: v }))
+    updateURL({ status: v, page: '1' })
+    setPage(1)
+  }
+  const handleCategoryChange = (v: string) => {
+    setFilters((p) => ({ ...p, category: v }))
+    updateURL({ category: v, page: '1' })
+    setPage(1)
+  }
+
   const fetchAssets = React.useCallback(async () => {
     setLoading(true)
     try {
+      const sp = searchParams
       const params = new URLSearchParams({
         page: page.toString(),
         pageSize: pageSize.toString(),
         ...(filters.status && { status: filters.status }),
         ...(filters.category && { category: filters.category }),
         ...(filters.search && { search: filters.search }),
+        ...(sp.get('assignedToId') ? { assignedToId: sp.get('assignedToId')! } : {}),
+        ...(sp.get('department') ? { department: sp.get('department')! } : {}),
       })
       const res = await fetch(`/api/assets?${params}`)
       const data = await res.json()
@@ -60,7 +118,7 @@ export default function AssetsPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, pageSize, filters.status, filters.category, filters.search])
+  }, [page, pageSize, filters.status, filters.category, filters.search, searchParams])
   
   React.useEffect(() => {
     fetchAssets()
@@ -123,8 +181,8 @@ export default function AssetsPage() {
             <div className="flex flex-wrap gap-4">
               <Input
                 placeholder="Search assets..."
-                value={filters.search}
-                onChange={(e) => setFilters({ ...filters, search: e.target.value, page: 1 })}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
                 className="max-w-xs"
               />
               <Select
@@ -138,7 +196,7 @@ export default function AssetsPage() {
                   { value: 'LOST', label: 'Lost' },
                 ]}
                 value={filters.status}
-                onChange={(e) => setFilters({ ...filters, status: e.target.value, page: 1 })}
+                onChange={(e) => handleStatusChange(e.target.value)}
               />
               <Select
                 options={[
@@ -156,7 +214,7 @@ export default function AssetsPage() {
                   { value: 'OTHER', label: 'Other' },
                 ]}
                 value={filters.category}
-                onChange={(e) => setFilters({ ...filters, category: e.target.value, page: 1 })}
+                onChange={(e) => handleCategoryChange(e.target.value)}
               />
             </div>
           </CardContent>
@@ -177,7 +235,7 @@ export default function AssetsPage() {
                   page,
                   pageSize,
                   total,
-                  onPageChange: setPage,
+                  onPageChange: applyPage,
                 }}
               />
             )}
@@ -185,5 +243,13 @@ export default function AssetsPage() {
         </Card>
       </div>
     </DashboardLayout>
+  )
+}
+
+export default function AssetsPage() {
+  return (
+    <React.Suspense fallback={<DashboardLayout><div className="p-8"><TableSkeleton rows={5} cols={7} /></div></DashboardLayout>}>
+      <AssetsPageContent />
+    </React.Suspense>
   )
 }
