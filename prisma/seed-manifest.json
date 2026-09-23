@@ -1,0 +1,63 @@
+{
+  "generatedAt": "2026-09-23T11:16:04.221Z",
+  "emails": [
+    "admin@company.com",
+    "hr.head@company.com",
+    "it.head@company.com",
+    "compliance.head@company.com",
+    "it.officer@company.com",
+    "hr.officer@company.com",
+    "compliance.officer@company.com",
+    "timileyin.olaore@company.com",
+    "obinna.uzorka@company.com",
+    "thomas.micheal@company.com",
+    "ogechuku.okunna@company.com",
+    "abiodun@company.com"
+  ],
+  "employeeIds": [
+    "EMP-001",
+    "EMP-002",
+    "EMP-003",
+    "EMP-004",
+    "EMP-005",
+    "EMP-006",
+    "EMP-007",
+    "EMP-008",
+    "EMP-009",
+    "EMP-010",
+    "EMP-011",
+    "EMP-012"
+  ],
+  "assetIds": [
+    "7D9D0A1CDA2F",
+    "FF4716A917DE",
+    "ED43A12200E7",
+    "A108FF8A3EC5",
+    "CT-WDFZV0AGM61540",
+    "C94GRAT#BH5",
+    "8D603EA#BH5"
+  ],
+  "accessoryIds": [
+    "ACC-CHR-001",
+    "CHARGER-CT:WFZJR0F1RCETNV",
+    "CHARGER-CT:WEQJA0B1R9O5EI",
+    "CHARGER-CT:557C60BM5PF3CL",
+    "ACC-CHR-CT-WDFZV0AGM61540",
+    "CT:WTYYV 2cored",
+    "CT:WMVXQ"
+  ],
+  "accessoryCodes": [
+    "CHR",
+    "KEY",
+    "MOU",
+    "HED",
+    "CAS",
+    "DOC"
+  ],
+  "systemKeys": [
+    "high_value_threshold",
+    "approval_reminder_days",
+    "email_notifications_enabled"
+  ],
+  "note": "Deseed deletes only rows matching these identifiers. Safe to commit; deseed reads this or the static lists above."
+}
